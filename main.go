@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"time"
+	"strings"
  
 	"github.com/gin-contrib/cors"
 
@@ -16,12 +17,12 @@ func main() {
 
 	r := gin.Default()
  
-	// ✅ CORS configuration
 
 	r.Use(cors.New(cors.Config{
 
-		AllowOrigins:     []string{"http://localhost:5174", "http://localhost:3000"},
-
+AllowOriginFunc: func(origin string) bool {
+            return strings.HasPrefix(origin, "http://localhost")
+        },
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
@@ -34,7 +35,13 @@ func main() {
  
 	r.POST("/api/login", Login)
 
-	r.POST("/api/register", Register)
+	r.POST("/api/createaccount", Register)
+
+	r.GET("/api/me",Me)
+	r.POST("/api/applyleave",ApplyLeave)
+	r.GET("/api/leaves", GetLeaves)
+
+
 
 
  

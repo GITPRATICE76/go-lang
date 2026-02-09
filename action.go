@@ -12,13 +12,14 @@ type LeaveActionRequest struct {
 	UserID  int    `json:"user_id"`   // MANAGER ID
 	LeaveID int    `json:"leave_id"`  // leaves.id
 	Action  string `json:"action"`    // APPROVED / REJECTED
-	Remarks string `json:"remarks"`   // manager reason
+	Remarks string `json:"remarks"`   // manager remarks
 }
 
 func LeaveAction(c *gin.Context) {
 
 	var req LeaveActionRequest
 
+	// 1️⃣ Bind request
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "Invalid request payload",
@@ -26,6 +27,7 @@ func LeaveAction(c *gin.Context) {
 		return
 	}
 
+	// 2️⃣ Validate action
 	if req.Action != "APPROVED" && req.Action != "REJECTED" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "Action must be APPROVED or REJECTED",
@@ -33,6 +35,7 @@ func LeaveAction(c *gin.Context) {
 		return
 	}
 
+	// 3️⃣ Validate remarks
 	if strings.TrimSpace(req.Remarks) == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "Remarks are required",
@@ -40,6 +43,7 @@ func LeaveAction(c *gin.Context) {
 		return
 	}
 
+	// 4️⃣ DB connection
 	db, err := ConnectDB()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -49,7 +53,7 @@ func LeaveAction(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// check manager role
+	// 5️⃣ Check manager role
 	var role string
 	err = db.QueryRow(
 		`SELECT role FROM users WHERE id = @id`,
@@ -63,16 +67,15 @@ func LeaveAction(c *gin.Context) {
 		return
 	}
 
-	// update leave
+	// 6️⃣ UPDATE leave (🔥 NO STATUS RESTRICTION)
 	result, err := db.Exec(
 		`
 		UPDATE leaves
-		SET 
+		SET
 			status = @status,
 			remarks = @remarks,
 			approved_by = @approved_by
 		WHERE id = @leave_id
-		  AND status = 'PENDING'
 		`,
 		sql.Named("status", req.Action),
 		sql.Named("remarks", req.Remarks),
@@ -87,14 +90,16 @@ func LeaveAction(c *gin.Context) {
 		return
 	}
 
+	// 7️⃣ Check affected rows
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "Leave not found or already processed",
+			"message": "Leave not found",
 		})
 		return
 	}
 
+	// 8️⃣ Success
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Leave " + req.Action + " successfully",
 	})

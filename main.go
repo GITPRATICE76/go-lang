@@ -34,12 +34,14 @@ AllowOriginFunc: func(origin string) bool {
 	}))
  
 	r.POST("/api/login", Login)
-
 	r.POST("/api/createaccount", Register)
-
 	r.GET("/api/me",Me)
 	r.POST("/api/applyleave",ApplyLeave)
 	r.GET("/api/leaves", GetLeaves)
+	r.POST("/api/leave/action", LeaveAction)
+	r.GET("/api/org-chart", GetOrgChart)
+
+
 
 
 

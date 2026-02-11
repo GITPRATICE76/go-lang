@@ -37,6 +37,8 @@ func main() {
 		auth.GET("/leaves", GetLeaves)
 		auth.POST("/leave/action", LeaveAction)
 		auth.GET("/org-chart", GetOrgChart)
+		auth.GET("/leave/analytics", GetLeaveAnalytics)
+		
 	}
 
 	log.Println("Server running on port 8080")

@@ -64,6 +64,7 @@ func Login(c *gin.Context) {
 		"role":       role,
 		"department": department,
 		"exp":        time.Now().Add(time.Hour * 24).Unix(), // expires in 24h
+		"team":       team,
 	})
 
 	tokenString, err := token.SignedString(jwtSecret)

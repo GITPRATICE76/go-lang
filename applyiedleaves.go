@@ -30,19 +30,18 @@ func GetLeaves(c *gin.Context) {
 	defer db.Close()
 
 	query := `
-		SELECT 
-			l.id,
-			u.name,
-			l.leave_type,
-			l.status,
-			l.reason,
-			l.from_date,
-			l.to_date
-		FROM leaves l
-		JOIN users u ON l.user_id = u.id
-		WHERE l.status = 'PENDING'
-		ORDER BY l.created_at DESC
-	`
+	SELECT 
+		l.id,
+		u.name,
+		l.leave_type,
+		l.status,
+		l.reason,
+		l.from_date,
+		l.to_date
+	FROM leaves l
+	JOIN users u ON l.user_id = u.id
+	ORDER BY l.created_at DESC
+`
 
 	rows, err := db.Query(query)
 	if err != nil {

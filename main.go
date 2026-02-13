@@ -2,8 +2,8 @@ package main
 
 import (
 	"log"
-	"time"
 	"strings"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -38,7 +38,8 @@ func main() {
 		auth.POST("/leave/action", LeaveAction)
 		auth.GET("/org-chart", GetOrgChart)
 		auth.GET("/leave/analytics", GetLeaveAnalytics)
-		
+		auth.GET("/dashboard/summary", GetDashboardSummary)
+
 	}
 
 	log.Println("Server running on port 8080")

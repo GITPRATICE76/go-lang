@@ -40,87 +40,97 @@ func GetDashboardSummary(c *gin.Context) {
 	}
 	defer db.Close()
 
-	year := c.Query("year")
-	month := c.Query("month")
+	now := time.Now()
 
-	if year == "" || month == "" {
-		c.JSON(400, gin.H{"message": "year and month required"})
-		return
-	}
-
-	startDate := year + "-" + month + "-01"
-
-	// safer way to get end date
-	startTime, _ := time.Parse("2006-1-2", startDate)
-	endTime := startTime.AddDate(0, 1, -1)
-
-	prevStart := startTime.AddDate(0, -1, 0)
-	prevEnd := prevStart.AddDate(0, 1, -1)
+	// ✅ Current Month Range
+	startDate := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	endDate := startDate.AddDate(0, 1, -1)
 
 	var summary DashboardSummary
 
-	// ================================================
-	// 🔴 Highest Leave Date (Current Month)
-	// ================================================
+	// =====================================================
+	// 🔴 1. Highest Leave Date (overlapping days counted)
+	// =====================================================
 	query1 := `
 	SELECT TOP 1
-		CAST(from_date AS DATE) as leave_date,
-		COUNT(*) as total
-	FROM leaves
-	WHERE status = 'APPROVED'
-	AND from_date BETWEEN @p1 AND @p2
-	GROUP BY CAST(from_date AS DATE)
-	ORDER BY total DESC
+		d.date_value,
+		COUNT(l.id) as total
+	FROM (
+		SELECT DATEADD(DAY, number, @startDate) as date_value
+		FROM master..spt_values
+		WHERE type='P'
+		AND DATEADD(DAY, number, @startDate) <= @endDate
+	) d
+	LEFT JOIN leaves l
+		ON l.status='APPROVED'
+		AND d.date_value BETWEEN l.from_date AND l.to_date
+	GROUP BY d.date_value
+	ORDER BY COUNT(l.id) DESC, d.date_value ASC
 	`
 
-	var leaveDate sql.NullTime
+	var highestDate sql.NullTime
 
-	err = db.QueryRow(query1, startTime, endTime).
-		Scan(&leaveDate, &summary.HighestLeaveDate.Count)
+	err = db.QueryRow(query1,
+		sql.Named("startDate", startDate),
+		sql.Named("endDate", endDate)).
+		Scan(&highestDate, &summary.HighestLeaveDate.Count)
 
-	if err == nil && leaveDate.Valid {
-		summary.HighestLeaveDate.Date =
-			leaveDate.Time.Format("Jan 02")
+	if err == nil && highestDate.Valid {
+		summary.HighestLeaveDate.Date = highestDate.Time.Format("Jan 02")
 	}
 
-	// ================================================
-	// 🟣 Team With Highest Leave (Previous Month)
-	// ================================================
+	// =====================================================
+	// 🟣 2. Team With Highest Leave (total leave days)
+	// =====================================================
 	query2 := `
 	SELECT TOP 1
 		u.team,
-		COUNT(*) as total
+		SUM(DATEDIFF(DAY,
+			CASE WHEN l.from_date < @startDate THEN @startDate ELSE l.from_date END,
+			CASE WHEN l.to_date > @endDate THEN @endDate ELSE l.to_date END
+		) + 1) as total_days
 	FROM leaves l
 	JOIN users u ON l.user_id = u.id
-	WHERE l.status = 'APPROVED'
-	AND l.from_date BETWEEN @p1 AND @p2
+	WHERE l.status='APPROVED'
+	AND l.from_date <= @endDate
+	AND l.to_date >= @startDate
 	GROUP BY u.team
-	ORDER BY total DESC
+	ORDER BY total_days DESC, u.team ASC
 	`
 
-	db.QueryRow(query2, prevStart, prevEnd).
+	db.QueryRow(query2,
+		sql.Named("startDate", startDate),
+		sql.Named("endDate", endDate)).
 		Scan(&summary.TeamHighestLeave.Team,
 			&summary.TeamHighestLeave.Count)
 
-	// ================================================
-	// 🟡 Peak Leave Week (Current Month)
-	// ================================================
+	// =====================================================
+	// 🟡 3. Peak Leave Week (Week 1–4 of Month)
+	// =====================================================
 	query3 := `
 	SELECT TOP 1
-		DATEPART(WEEK, from_date) as week_number,
-		MIN(from_date) as start_date,
-		MAX(from_date) as end_date,
-		COUNT(*) as total
-	FROM leaves
-	WHERE status = 'APPROVED'
-	AND from_date BETWEEN @p1 AND @p2
-	GROUP BY DATEPART(WEEK, from_date)
-	ORDER BY total DESC
+		((DAY(d.date_value)-1)/7)+1 as week_number,
+		MIN(d.date_value),
+		MAX(d.date_value),
+		COUNT(l.id) as total
+	FROM (
+		SELECT DATEADD(DAY, number, @startDate) as date_value
+		FROM master..spt_values
+		WHERE type='P'
+		AND DATEADD(DAY, number, @startDate) <= @endDate
+	) d
+	LEFT JOIN leaves l
+		ON l.status='APPROVED'
+		AND d.date_value BETWEEN l.from_date AND l.to_date
+	GROUP BY ((DAY(d.date_value)-1)/7)+1
+	ORDER BY COUNT(l.id) DESC, MIN(d.date_value) ASC
 	`
 
 	var weekStart, weekEnd sql.NullTime
 
-	err = db.QueryRow(query3, startTime, endTime).
+	err = db.QueryRow(query3,
+		sql.Named("startDate", startDate),
+		sql.Named("endDate", endDate)).
 		Scan(&summary.PeakLeaveWeek.WeekNumber,
 			&weekStart,
 			&weekEnd,
@@ -128,31 +138,35 @@ func GetDashboardSummary(c *gin.Context) {
 
 	if err == nil {
 		if weekStart.Valid {
-			summary.PeakLeaveWeek.Start =
-				weekStart.Time.Format("Jan 02")
+			summary.PeakLeaveWeek.Start = weekStart.Time.Format("Jan 02")
 		}
 		if weekEnd.Valid {
-			summary.PeakLeaveWeek.End =
-				weekEnd.Time.Format("Jan 02")
+			summary.PeakLeaveWeek.End = weekEnd.Time.Format("Jan 02")
 		}
 	}
 
-	// ================================================
-	// 🔵 Top Leave Taker (Previous Month)
-	// ================================================
+	// =====================================================
+	// 🔵 4. Top Leave Taker (actual leave days counted)
+	// =====================================================
 	query4 := `
 	SELECT TOP 1
 		u.name,
-		COUNT(*) as total
+		SUM(DATEDIFF(DAY,
+			CASE WHEN l.from_date < @startDate THEN @startDate ELSE l.from_date END,
+			CASE WHEN l.to_date > @endDate THEN @endDate ELSE l.to_date END
+		) + 1) as total_days
 	FROM leaves l
 	JOIN users u ON l.user_id = u.id
-	WHERE l.status = 'APPROVED'
-	AND l.from_date BETWEEN @p1 AND @p2
+	WHERE l.status='APPROVED'
+	AND l.from_date <= @endDate
+	AND l.to_date >= @startDate
 	GROUP BY u.name
-	ORDER BY total DESC
+	ORDER BY total_days DESC, u.name ASC
 	`
 
-	db.QueryRow(query4, prevStart, prevEnd).
+	db.QueryRow(query4,
+		sql.Named("startDate", startDate),
+		sql.Named("endDate", endDate)).
 		Scan(&summary.TopLeaveTaker.Name,
 			&summary.TopLeaveTaker.Count)
 

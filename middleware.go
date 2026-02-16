@@ -31,10 +31,23 @@ func AuthMiddleware() gin.HandlerFunc {
             return
         }
 
+        // claims := token.Claims.(jwt.MapClaims)
+
+        // c.Set("userID", claims["id"])
         claims := token.Claims.(jwt.MapClaims)
 
-        c.Set("userID", claims["id"])
-        c.Set("role", claims["role"])
+// JWT numbers are float64
+idFloat, ok := claims["id"].(float64)
+if !ok {
+    c.JSON(401, gin.H{"message": "Invalid token id"})
+    c.Abort()
+    return
+}
+
+c.Set("userID", int(idFloat))
+c.Set("role", claims["role"])
+
+        // c.Set("role", claims["role"])
 
         c.Next()
     }

@@ -39,6 +39,11 @@ func main() {
 		auth.GET("/org-chart", GetOrgChart)
 		auth.GET("/leave/analytics", GetLeaveAnalytics)
 		auth.GET("/dashboard/summary", GetDashboardSummary)
+	    auth.GET("/employee/dashboard", GetEmployeeDashboardSummary)
+		auth.GET("/holidays", GetHolidays)
+
+
+
 
 	}
 

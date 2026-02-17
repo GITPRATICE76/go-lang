@@ -1,36 +1,36 @@
 package main
-
+ 
 import (
-	"database/sql"
-	"time"
-
-	"github.com/gin-gonic/gin"
+    "database/sql"
+    "time"
+ 
+    "github.com/gin-gonic/gin"
 )
-
+ 
 type DashboardSummary struct {
-	HighestLeaveDate struct {
-		Date  string `json:"date"`
-		Count int    `json:"count"`
-	} `json:"highest_leave_date"`
-
-	TeamHighestLeave struct {
-		Team  string `json:"team"`
-		Count int    `json:"count"`
-	} `json:"team_highest_leave"`
-
-	PeakLeaveWeek struct {
-		WeekNumber int    `json:"week_number"`
-		Start      string `json:"start"`
-		End        string `json:"end"`
-		Count      int    `json:"count"`
-	} `json:"peak_leave_week"`
-
-	TopLeaveTaker struct {
-		Name  string `json:"name"`
-		Count int    `json:"count"`
-	} `json:"top_leave_taker"`
+    HighestLeaveDate struct {
+        Date  string `json:"date"`
+        Count int    `json:"count"`
+    } `json:"highest_leave_date"`
+ 
+    TeamHighestLeave struct {
+        Team  string `json:"team"`
+        Count int    `json:"count"`
+    } `json:"team_highest_leave"`
+ 
+    PeakLeaveWeek struct {
+        WeekNumber int    `json:"week_number"`
+        Start      string `json:"start"`
+        End        string `json:"end"`
+        Count      int    `json:"count"`
+    } `json:"peak_leave_week"`
+ 
+    TopLeaveTaker struct {
+        Name  string `json:"name"`
+        Count int    `json:"count"`
+    } `json:"top_leave_taker"`
 }
-
+ 
 func GetDashboardSummary(c *gin.Context) {
 
 	db, err := ConnectDB()
@@ -172,3 +172,5 @@ func GetDashboardSummary(c *gin.Context) {
 
 	c.JSON(200, summary)
 }
+ 
+ 

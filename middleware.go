@@ -35,7 +35,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		idFloat := claims["id"].(float64)
 		role := claims["role"].(string)
 
-		c.Set("user_id", int(idFloat))  // MUST MATCH
+		c.Set("user_id", int(idFloat))  
 		c.Set("role", role)
 
 		c.Next()

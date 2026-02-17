@@ -67,7 +67,7 @@ func LeaveAction(c *gin.Context) {
 		return
 	}
 
-	// 6️⃣ UPDATE leave (🔥 NO STATUS RESTRICTION)
+	// 6️⃣ UPDATE leave 
 	result, err := db.Exec(
 		`
 		UPDATE leaves

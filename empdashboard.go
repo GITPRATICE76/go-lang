@@ -15,7 +15,9 @@ func GetEmployeeDashboardSummary(c *gin.Context) {
 	}
 	defer db.Close()
 
-	userID := c.GetInt("userID")
+	// userID := c.GetInt("userID")
+	userID := c.GetInt("user_id")
+
 
 	if userID == 0 {
 		c.JSON(401, gin.H{"message": "Invalid user"})

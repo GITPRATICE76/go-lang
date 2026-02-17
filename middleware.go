@@ -9,47 +9,37 @@ import (
 )
 
 func AuthMiddleware() gin.HandlerFunc {
-    return func(c *gin.Context) {
+	return func(c *gin.Context) {
 
-        authHeader := c.GetHeader("Authorization")
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(401, gin.H{"message": "Authorization header missing"})
+			c.Abort()
+			return
+		}
 
-        if authHeader == "" {
-            c.JSON(401, gin.H{"message": "Authorization header missing"})
-            c.Abort()
-            return
-        }
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
-        tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			return jwtSecret, nil
+		})
 
-        token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-            return jwtSecret, nil
-        })
+		if err != nil || !token.Valid {
+			c.JSON(401, gin.H{"message": "Invalid token"})
+			c.Abort()
+			return
+		}
 
-        if err != nil || !token.Valid {
-            c.JSON(401, gin.H{"message": "Invalid token"})
-            c.Abort()
-            return
-        }
+		claims := token.Claims.(jwt.MapClaims)
 
-        // claims := token.Claims.(jwt.MapClaims)
+		idFloat := claims["id"].(float64)
+		role := claims["role"].(string)
 
-        // c.Set("userID", claims["id"])
-        claims := token.Claims.(jwt.MapClaims)
+		c.Set("user_id", int(idFloat))  // MUST MATCH
+		c.Set("role", role)
 
-// JWT numbers are float64
-idFloat, ok := claims["id"].(float64)
-if !ok {
-    c.JSON(401, gin.H{"message": "Invalid token id"})
-    c.Abort()
-    return
+		c.Next()
+	}
 }
 
-c.Set("userID", int(idFloat))
-c.Set("role", claims["role"])
-
-        // c.Set("role", claims["role"])
-
-        c.Next()
-    }
-}
 

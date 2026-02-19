@@ -1,52 +1,91 @@
 package main
-
+ 
 import (
+
 	"log"
-	"strings"
+
+	"os"
+
 	"time"
-
+ 
 	"github.com/gin-contrib/cors"
+
 	"github.com/gin-gonic/gin"
+
 )
-
+ 
 func main() {
-
+ 
 	r := gin.Default()
+ 
+	// ✅ CORS Configuration (Allow all origins for now)
 
-	// ✅ CORS
 	r.Use(cors.New(cors.Config{
-		AllowOriginFunc: func(origin string) bool {
-			return strings.HasPrefix(origin, "http://localhost")
-		},
+
+		AllowOrigins:     []string{"*"}, // Allow all (we can restrict later)
+
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		AllowCredentials: true,
+
+		AllowCredentials: false,
+
 		MaxAge:           12 * time.Hour,
+
 	}))
-
+ 
 	// 🔓 Public Routes
-	r.POST("/api/login", Login)
-	r.POST("/api/createaccount", Register)
 
+	r.POST("/api/login", Login)
+
+	r.POST("/api/createaccount", Register)
+ 
 	// 🔐 Protected Routes (JWT required)
+
 	auth := r.Group("/api")
+
 	auth.Use(AuthMiddleware())
+
 	{
+
 		auth.GET("/me", Me)
+
 		auth.POST("/applyleave", ApplyLeave)
+
 		auth.GET("/leaves", GetLeaves)
+
 		auth.POST("/leave/action", LeaveAction)
+
 		auth.GET("/org-chart", GetOrgChart)
+
 		auth.GET("/leave/analytics", GetLeaveAnalytics)
+
 		auth.GET("/dashboard/summary", GetDashboardSummary)
-	    auth.GET("/employee/dashboard", GetEmployeeDashboardSummary)
+
+		auth.GET("/employee/dashboard", GetEmployeeDashboardSummary)
+
 		auth.GET("/holidays", GetHolidays)
 
+	}
+ 
+	// ✅ IMPORTANT: Use Render PORT
 
+	port := os.Getenv("PORT")
 
+	if port == "" {
+
+		port = "8080" // for local development
+
+	}
+ 
+	log.Println("Server running on port", port)
+ 
+	if err := r.Run(":" + port); err != nil {
+
+		log.Fatal("Failed to start server:", err)
 
 	}
 
-	log.Println("Server running on port 8080")
-	r.Run(":8080")
 }
+
+ 

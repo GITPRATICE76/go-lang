@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"strings"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -15,9 +14,7 @@ func main() {
 
 	// ✅ CORS
 	r.Use(cors.New(cors.Config{
-		AllowOriginFunc: func(origin string) bool {
-			return strings.HasPrefix(origin, "http://localhost")
-		},
+		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
@@ -39,11 +36,8 @@ func main() {
 		auth.GET("/org-chart", GetOrgChart)
 		auth.GET("/leave/analytics", GetLeaveAnalytics)
 		auth.GET("/dashboard/summary", GetDashboardSummary)
-	    auth.GET("/employee/dashboard", GetEmployeeDashboardSummary)
+		auth.GET("/employee/dashboard", GetEmployeeDashboardSummary)
 		auth.GET("/holidays", GetHolidays)
-
-
-
 
 	}
 

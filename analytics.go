@@ -2,7 +2,7 @@ package main
 
 import (
 	"database/sql"
-	
+
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -46,7 +46,7 @@ func GetLeaveAnalytics(c *gin.Context) {
 			SELECT u.name
 			FROM leaves l
 			JOIN users u ON l.user_id = u.id
-			WHERE l.status IN ('PENDING', 'APPROVED')
+			WHERE l.status IN ('APPROVED')
 			AND @date BETWEEN l.from_date AND l.to_date
 		`, sql.Named("date", dateStr))
 
@@ -75,16 +75,15 @@ func GetLeaveAnalytics(c *gin.Context) {
 		}
 
 		result = append(result, gin.H{
-			"date":                        dateStr,
-			"total_resources":             totalResources,
-			"on_leave":                    onLeave,
-			"leave_percentage":            leavePercent,
-			"available_percentage":        availablePercent,
+			"date":                         dateStr,
+			"total_resources":              totalResources,
+			"on_leave":                     onLeave,
+			"leave_percentage":             leavePercent,
+			"available_percentage":         availablePercent,
 			"remaining_allowed_percentage": remainingAllowed,
-			"employees_on_leave":          employees,
+			"employees_on_leave":           employees,
 		})
 	}
 
 	c.JSON(200, result)
 }
-

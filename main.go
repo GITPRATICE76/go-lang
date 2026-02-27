@@ -3,6 +3,7 @@ package main
 import (
 
 	"log"
+	"time"
 
 	"os"
 
@@ -21,14 +22,12 @@ func main() {
 	// ✅ CORS Configuration (Allow all origins for now)
 
 	r.Use(cors.New(cors.Config{
-
-		AllowOrigins:     []string{"*"}, // Allow all (we can restrict later)
-
+		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 
-		AllowCredentials: false,
+		AllowCredentials: true,
 
 		MaxAge:           12 * time.Hour,
 
@@ -61,28 +60,8 @@ func main() {
 		auth.GET("/leave/analytics", GetLeaveAnalytics)
 
 		auth.GET("/dashboard/summary", GetDashboardSummary)
-
 		auth.GET("/employee/dashboard", GetEmployeeDashboardSummary)
-
 		auth.GET("/holidays", GetHolidays)
-
-	}
- 
-	// ✅ IMPORTANT: Use Render PORT
-
-	port := os.Getenv("PORT")
-
-	if port == "" {
-
-		port = "8080" // for local development
-
-	}
- 
-	log.Println("Server running on port", port)
- 
-	if err := r.Run(":" + port); err != nil {
-
-		log.Fatal("Failed to start server:", err)
 
 	}
 

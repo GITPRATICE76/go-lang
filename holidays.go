@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	
 
 	"github.com/gin-gonic/gin"
 )
@@ -74,14 +73,13 @@ func GetHolidays(c *gin.Context) {
 
 	if role == "MANAGER" {
 
-		// 🔥 Manager sees ALL employees
 		leaveRows, err = db.Query(`
 			SELECT u.id, u.name, l.leave_type, l.from_date, l.to_date
 			FROM leaves l
 			JOIN users u ON l.user_id = u.id
 			WHERE l.status = 'APPROVED'
-			AND YEAR(l.from_date) = @year
-			AND MONTH(l.from_date) = @month
+			AND l.from_date <= EOMONTH(DATEFROMPARTS(@year,@month,1))
+            AND l.to_date >= DATEFROMPARTS(@year,@month,1)
 		`,
 			sql.Named("year", year),
 			sql.Named("month", month),
@@ -146,6 +144,3 @@ func GetHolidays(c *gin.Context) {
 		"leaves":   leaves,
 	})
 }
-
-
-

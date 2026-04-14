@@ -61,7 +61,7 @@ func main() {
 
 		auth.GET("/holidays", GetHolidays)
 
-		auth.GET("/leave/history", GetLeaveHistory)
+		auth.POST("/leave/history", GetLeaveHistory)
 
 	}
 

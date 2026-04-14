@@ -6,12 +6,38 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type LeaveHistoryRequest struct {
+	Page   int    `json:"page"`
+	Limit  int    `json:"limit"`
+	Start  string `json:"start"`
+	End    string `json:"end"`
+	Search string `json:"search"`
+}
+
 func GetLeaveHistory(c *gin.Context) {
 
-	start := c.Query("start")
-	end := c.Query("end")
-	month := c.Query("month")
-	year := c.Query("year")
+	var req LeaveHistoryRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	if req.Page == 0 {
+		req.Page = 1
+	}
+
+	if req.Limit == 0 {
+		req.Limit = 10
+	}
+
+	offset := (req.Page - 1) * req.Limit
+
+	db, err := ConnectDB()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "DB connection failed"})
+		return
+	}
 
 	query := `
 	SELECT 
@@ -27,45 +53,28 @@ func GetLeaveHistory(c *gin.Context) {
 		l.created_at
 	FROM leaves l
 	JOIN users u ON l.user_id = u.id
+	WHERE
+	(@p1 = '' OR u.name LIKE '%' + @p1 + '%')
+	AND (@p2 = '' OR l.from_date >= @p2)
+	AND (@p3 = '' OR l.from_date <= @p3)
+	ORDER BY l.from_date DESC
+	OFFSET @p4 ROWS FETCH NEXT @p5 ROWS ONLY
 	`
 
-	var args []interface{}
+	rows, err := db.Query(
+		query,
+		req.Search,
+		req.Start,
+		req.End,
+		offset,
+		req.Limit,
+	)
 
-	if start != "" && end != "" {
-
-		query += " WHERE l.from_date BETWEEN @p1 AND @p2"
-		args = append(args, start, end)
-
-	} else if month != "" && year != "" {
-
-		query += " WHERE MONTH(l.from_date) = @p1 AND YEAR(l.from_date) = @p2"
-		args = append(args, month, year)
-
-	} else if year != "" {
-
-		query += " WHERE YEAR(l.from_date) = @p1"
-		args = append(args, year)
-
-	}
-
-	query += " ORDER BY l.from_date DESC"
-
-	// connect DB using your existing db.go
-	db, err := ConnectDB()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Database connection failed",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	rows, err := db.Query(query, args...)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
-		})
-		return
-	}
 	defer rows.Close()
 
 	var results []gin.H
@@ -116,5 +125,30 @@ func GetLeaveHistory(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, results)
+	// count query for pagination
+	var total int
+
+	countQuery := `
+	SELECT COUNT(*)
+	FROM leaves l
+	JOIN users u ON l.user_id = u.id
+	WHERE
+	(@p1 = '' OR u.name LIKE '%' + @p1 + '%')
+	AND (@p2 = '' OR l.from_date >= @p2)
+	AND (@p3 = '' OR l.from_date <= @p3)
+	`
+
+	err = db.QueryRow(countQuery, req.Search, req.Start, req.End).Scan(&total)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":  results,
+		"total": total,
+		"page":  req.Page,
+		"limit": req.Limit,
+	})
 }

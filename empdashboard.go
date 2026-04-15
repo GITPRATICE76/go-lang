@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,7 +18,6 @@ func GetEmployeeDashboardSummary(c *gin.Context) {
 
 	// userID := c.GetInt("userID")
 	userID := c.GetInt("user_id")
-
 
 	if userID == 0 {
 		c.JSON(401, gin.H{"message": "Invalid user"})
@@ -151,16 +151,49 @@ func GetEmployeeDashboardSummary(c *gin.Context) {
 			"name": name,
 		})
 	}
+	var leaveRemarks []gin.H
+
+	rowsRemarks, err := db.Query(`
+	SELECT TOP 10 id, status, remarks, leave_type, from_date, to_date
+	FROM leaves
+	WHERE user_id = @userID
+	ORDER BY created_at DESC
+`, sql.Named("userID", userID))
+
+	if err != nil {
+		fmt.Println("REMARKS ERROR:", err)
+		c.JSON(500, gin.H{"message": "Failed to fetch remarks"})
+		return
+	}
+	defer rowsRemarks.Close()
+
+	for rowsRemarks.Next() {
+		var id int
+		var status, remarks, leaveType string
+		var fromDate, toDate string
+
+		rowsRemarks.Scan(&id, &status, &remarks, &leaveType, &fromDate, &toDate)
+
+		leaveRemarks = append(leaveRemarks, gin.H{
+			"id":         id,
+			"status":     status,
+			"remarks":    remarks,
+			"leave_type": leaveType,
+			"from_date":  fromDate,
+			"to_date":    toDate,
+		})
+	}
 
 	// ✅ Final Response (Added team data)
 	c.JSON(200, gin.H{
-		"total_leaves_taken": totalApproved,
-		"pending_requests":   pending,
-		"rejected_requests":  rejected,
-		"casual_leaves":      casual,
-		"sick_leaves":        sick,
-		"currently_on_leave": currentlyOnLeave,
+		"total_leaves_taken":    totalApproved,
+		"pending_requests":      pending,
+		"rejected_requests":     rejected,
+		"casual_leaves":         casual,
+		"sick_leaves":           sick,
+		"currently_on_leave":    currentlyOnLeave,
 		"team_members_on_leave": teamMembers,
 		"team_total_on_leave":   len(teamMembers),
+		"leave_remarks":         leaveRemarks,
 	})
 }

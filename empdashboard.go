@@ -62,28 +62,26 @@ func GetEmployeeDashboardSummary(c *gin.Context) {
 		return
 	}
 
-	// ✅ Casual
 	err = db.QueryRow(`
-		SELECT COUNT(*) 
-		FROM leaves 
-		WHERE user_id = @userID 
-		AND status = 'APPROVED'
-		AND leave_type = 'CASUAL'
-	`, sql.Named("userID", userID)).Scan(&casual)
+	SELECT ISNULL(SUM(DATEDIFF(DAY, from_date, to_date) + 1), 0)
+	FROM leaves 
+	WHERE user_id = @userID 
+	AND status = 'APPROVED'
+	AND leave_type = 'CASUAL'
+`, sql.Named("userID", userID)).Scan(&casual)
 	if err != nil {
 		fmt.Println("DB ERROR:", err)
 		c.JSON(500, gin.H{"message": err.Error()})
 		return
 	}
 
-	// ✅ Sick
 	err = db.QueryRow(`
-		SELECT COUNT(*) 
-		FROM leaves 
-		WHERE user_id = @userID 
-		AND status = 'APPROVED'
-		AND leave_type = 'SICK'
-	`, sql.Named("userID", userID)).Scan(&sick)
+	SELECT ISNULL(SUM(DATEDIFF(DAY, from_date, to_date) + 1), 0)
+	FROM leaves 
+	WHERE user_id = @userID 
+	AND status = 'APPROVED'
+	AND leave_type = 'SICK'
+`, sql.Named("userID", userID)).Scan(&sick)
 	if err != nil {
 		fmt.Println("DB ERROR:", err)
 		c.JSON(500, gin.H{"message": err.Error()})

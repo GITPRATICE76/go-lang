@@ -68,8 +68,6 @@ func ApplyLeave(c *gin.Context) {
 		return
 	}
 	defer db.Close()
-
-	// 🔐 Check user role
 	var role string
 	err = db.QueryRow(
 		"SELECT role FROM users WHERE id = @id",

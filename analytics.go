@@ -20,11 +20,9 @@ func GetLeaveAnalytics(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// ✅ Total active employees
 	var totalResources int
 	err = db.QueryRow(`
 		SELECT COUNT(*) FROM users 
-		WHERE role = 'EMPLOYEE'
 	`).Scan(&totalResources)
 
 	if err != nil {

@@ -50,7 +50,9 @@ func GetLeaveHistory(c *gin.Context) {
 		l.leave_type,
 		l.reason,
 		l.status,
-		l.created_at
+		l.created_at,
+			DATEDIFF(day, l.from_date, l.to_date) + 1 AS days
+
 	FROM leaves l
 	JOIN users u ON l.user_id = u.id
 	WHERE
@@ -92,6 +94,7 @@ func GetLeaveHistory(c *gin.Context) {
 			reason    string
 			status    string
 			createdAt string
+			days      int 
 		)
 
 		err := rows.Scan(
@@ -105,6 +108,7 @@ func GetLeaveHistory(c *gin.Context) {
 			&reason,
 			&status,
 			&createdAt,
+			&days,
 		)
 
 		if err != nil {
@@ -122,6 +126,7 @@ func GetLeaveHistory(c *gin.Context) {
 			"reason":        reason,
 			"status":        status,
 			"created_at":    createdAt,
+			"days":          days,
 		})
 	}
 

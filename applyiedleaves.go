@@ -85,8 +85,15 @@ func GetLeaves(c *gin.Context) {
 
 	// 🔥 ROLE FILTER (IMPORTANT)
 	if role != "MANAGER" {
+
+		// 🔥 filter by team
 		baseQuery += " AND u.team = @p" + fmt.Sprint(paramIndex)
 		args = append(args, team)
+		paramIndex++
+
+		// 🔥 exclude self (IMPORTANT FIX)
+		baseQuery += " AND u.id != @p" + fmt.Sprint(paramIndex)
+		args = append(args, userID)
 		paramIndex++
 	}
 

@@ -185,7 +185,7 @@ func GetEmployeeDashboardSummary(c *gin.Context) {
 		})
 	}
 
-	// ✅ Final Response (Added team data)
+	
 	c.JSON(200, gin.H{
 		"total_leaves_taken":    totalApproved,
 		"pending_requests":      pending,

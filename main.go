@@ -42,6 +42,7 @@ func main() {
 	auth.Use(AuthMiddleware())
 
 	{
+
 		// refreash api
 		auth.GET("/me", Me)
 		// apply leave api for employees omly
@@ -62,6 +63,8 @@ func main() {
 		auth.GET("/holidays", GetHolidays)
 		// leave history
 		auth.POST("/leave/history", GetLeaveHistory)
+		auth.GET("/usercode/details", GetUserCodeDetails)
+ 
 
 	}
 

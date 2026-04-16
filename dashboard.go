@@ -18,6 +18,9 @@ type DashboardSummary struct {
 		Count int    `json:"count"`
 	} `json:"team_highest_leave"`
 
+	// ✅ NEW FOR RO
+	TeamTotalLeave int `json:"team_total_leave"`
+
 	PeakLeaveWeek struct {
 		WeekNumber int    `json:"week_number"`
 		Start      string `json:"start"`
@@ -40,24 +43,37 @@ func GetDashboardSummary(c *gin.Context) {
 	}
 	defer db.Close()
 
-	now := time.Now()
+	// 🔥 USER INFO
+	userID := c.GetInt("user_id")
+	role := c.GetString("role")
 
-	// Month range (same as before)
+	var team string
+
+	if role != "MANAGER" {
+		err = db.QueryRow(`
+			SELECT team FROM users WHERE id = @userID
+		`, sql.Named("userID", userID)).Scan(&team)
+
+		if err != nil {
+			c.JSON(500, gin.H{"message": "Failed to get team"})
+			return
+		}
+	}
+
+	now := time.Now()
 	startDate := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
 	endDate := startDate.AddDate(0, 1, -1)
-
-	// 🔴 NEW: Today (for highest leave date only)
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 
 	var summary DashboardSummary
 
 	// =====================================================
-	// 🔴 1. Highest Leave Date (FROM TODAY ONLY)
+	// 🔴 1. Highest Leave Date
 	// =====================================================
 	query1 := `
 	SELECT TOP 1
 		d.date_value,
-		COUNT(l.id) as total
+		COUNT(l.id)
 	FROM (
 		SELECT DATEADD(DAY, number, @today) as date_value
 		FROM master..spt_values
@@ -67,55 +83,90 @@ func GetDashboardSummary(c *gin.Context) {
 	LEFT JOIN leaves l
 		ON l.status='APPROVED'
 		AND d.date_value BETWEEN l.from_date AND l.to_date
+	LEFT JOIN users u ON l.user_id = u.id
+	WHERE (@team IS NULL OR u.team = @team)
 	GROUP BY d.date_value
 	ORDER BY COUNT(l.id) DESC, d.date_value ASC
 	`
 
 	var highestDate sql.NullTime
+	var teamParam interface{}
+
+	if role == "MANAGER" {
+		teamParam = nil
+	} else {
+		teamParam = team
+	}
 
 	err = db.QueryRow(query1,
 		sql.Named("today", today),
-		sql.Named("endDate", endDate)).
-		Scan(&highestDate, &summary.HighestLeaveDate.Count)
+		sql.Named("endDate", endDate),
+		sql.Named("team", teamParam),
+	).Scan(&highestDate, &summary.HighestLeaveDate.Count)
 
 	if err == nil && highestDate.Valid {
 		summary.HighestLeaveDate.Date = highestDate.Time.Format("Jan 02")
 	}
 
 	// =====================================================
-	// 🟣 2. Team With Highest Leave (UNCHANGED)
+	// 🟣 2. Team Highest Leave (ONLY MANAGER)
 	// =====================================================
-	query2 := `
-	SELECT TOP 1
-		u.team,
-		SUM(DATEDIFF(DAY,
-			CASE WHEN l.from_date < @startDate THEN @startDate ELSE l.from_date END,
-			CASE WHEN l.to_date > @endDate THEN @endDate ELSE l.to_date END
-		) + 1) as total_days
-	FROM leaves l
-	JOIN users u ON l.user_id = u.id
-	WHERE l.status='APPROVED'
-	AND l.from_date <= @endDate
-	AND l.to_date >= @startDate
-	GROUP BY u.team
-	ORDER BY total_days DESC, u.team ASC
-	`
+	if role == "MANAGER" {
+		query2 := `
+		SELECT TOP 1
+			u.team,
+			SUM(DATEDIFF(DAY,
+				CASE WHEN l.from_date < @startDate THEN @startDate ELSE l.from_date END,
+				CASE WHEN l.to_date > @endDate THEN @endDate ELSE l.to_date END
+			) + 1)
+		FROM leaves l
+		JOIN users u ON l.user_id = u.id
+		WHERE l.status='APPROVED'
+		AND l.from_date <= @endDate
+		AND l.to_date >= @startDate
+		GROUP BY u.team
+		ORDER BY 2 DESC
+		`
 
-	db.QueryRow(query2,
-		sql.Named("startDate", startDate),
-		sql.Named("endDate", endDate)).
-		Scan(&summary.TeamHighestLeave.Team,
+		db.QueryRow(query2,
+			sql.Named("startDate", startDate),
+			sql.Named("endDate", endDate),
+		).Scan(&summary.TeamHighestLeave.Team,
 			&summary.TeamHighestLeave.Count)
+	}
 
 	// =====================================================
-	// 🟡 3. Peak Leave Week (UNCHANGED)
+	// 🟢 2B. Team Total Leave (ONLY RO)
+	// =====================================================
+	if role != "MANAGER" {
+		err = db.QueryRow(`
+			SELECT 
+				ISNULL(SUM(DATEDIFF(DAY,
+					CASE WHEN l.from_date < @startDate THEN @startDate ELSE l.from_date END,
+					CASE WHEN l.to_date > @endDate THEN @endDate ELSE l.to_date END
+				) + 1), 0)
+			FROM leaves l
+			JOIN users u ON l.user_id = u.id
+			WHERE l.status='APPROVED'
+			AND l.from_date <= @endDate
+			AND l.to_date >= @startDate
+			AND u.team = @team
+		`,
+			sql.Named("startDate", startDate),
+			sql.Named("endDate", endDate),
+			sql.Named("team", team),
+		).Scan(&summary.TeamTotalLeave)
+	}
+
+	// =====================================================
+	// 🟡 3. Peak Leave Week
 	// =====================================================
 	query3 := `
 	SELECT TOP 1
-		((DAY(d.date_value)-1)/7)+1 as week_number,
+		((DAY(d.date_value)-1)/7)+1,
 		MIN(d.date_value),
 		MAX(d.date_value),
-		COUNT(l.id) as total
+		COUNT(l.id)
 	FROM (
 		SELECT DATEADD(DAY, number, @startDate) as date_value
 		FROM master..spt_values
@@ -125,31 +176,31 @@ func GetDashboardSummary(c *gin.Context) {
 	LEFT JOIN leaves l
 		ON l.status='APPROVED'
 		AND d.date_value BETWEEN l.from_date AND l.to_date
+	LEFT JOIN users u ON l.user_id = u.id
+	WHERE (@team IS NULL OR u.team = @team)
 	GROUP BY ((DAY(d.date_value)-1)/7)+1
-	ORDER BY COUNT(l.id) DESC, MIN(d.date_value) ASC
+	ORDER BY COUNT(l.id) DESC
 	`
 
-	var weekStart, weekEnd sql.NullTime
+	var ws, we sql.NullTime
 
 	err = db.QueryRow(query3,
 		sql.Named("startDate", startDate),
-		sql.Named("endDate", endDate)).
-		Scan(&summary.PeakLeaveWeek.WeekNumber,
-			&weekStart,
-			&weekEnd,
-			&summary.PeakLeaveWeek.Count)
+		sql.Named("endDate", endDate),
+		sql.Named("team", teamParam),
+	).Scan(&summary.PeakLeaveWeek.WeekNumber, &ws, &we, &summary.PeakLeaveWeek.Count)
 
 	if err == nil {
-		if weekStart.Valid {
-			summary.PeakLeaveWeek.Start = weekStart.Time.Format("Jan 02")
+		if ws.Valid {
+			summary.PeakLeaveWeek.Start = ws.Time.Format("Jan 02")
 		}
-		if weekEnd.Valid {
-			summary.PeakLeaveWeek.End = weekEnd.Time.Format("Jan 02")
+		if we.Valid {
+			summary.PeakLeaveWeek.End = we.Time.Format("Jan 02")
 		}
 	}
 
 	// =====================================================
-	// 🔵 4. Top Leave Taker (UNCHANGED)
+	// 🔵 4. Top Leave Taker
 	// =====================================================
 	query4 := `
 	SELECT TOP 1
@@ -157,21 +208,23 @@ func GetDashboardSummary(c *gin.Context) {
 		SUM(DATEDIFF(DAY,
 			CASE WHEN l.from_date < @startDate THEN @startDate ELSE l.from_date END,
 			CASE WHEN l.to_date > @endDate THEN @endDate ELSE l.to_date END
-		) + 1) as total_days
+		) + 1)
 	FROM leaves l
 	JOIN users u ON l.user_id = u.id
 	WHERE l.status='APPROVED'
 	AND l.from_date <= @endDate
 	AND l.to_date >= @startDate
+	AND (@team IS NULL OR u.team = @team)
 	GROUP BY u.name
-	ORDER BY total_days DESC, u.name ASC
+	ORDER BY 2 DESC
 	`
 
 	db.QueryRow(query4,
 		sql.Named("startDate", startDate),
-		sql.Named("endDate", endDate)).
-		Scan(&summary.TopLeaveTaker.Name,
-			&summary.TopLeaveTaker.Count)
+		sql.Named("endDate", endDate),
+		sql.Named("team", teamParam),
+	).Scan(&summary.TopLeaveTaker.Name,
+		&summary.TopLeaveTaker.Count)
 
 	c.JSON(200, summary)
 }

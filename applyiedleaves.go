@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -37,6 +38,23 @@ func GetLeaves(c *gin.Context) {
 	}
 	defer db.Close()
 
+	// 🔥 GET USER INFO
+	userID := c.GetInt("user_id")
+	role := c.GetString("role")
+
+	var team string
+
+	if role != "MANAGER" {
+		err = db.QueryRow(`
+			SELECT team FROM users WHERE id = @userID
+		`, sql.Named("userID", userID)).Scan(&team)
+
+		if err != nil {
+			c.JSON(500, gin.H{"message": "Failed to get team"})
+			return
+		}
+	}
+
 	var filter LeaveFilter
 
 	if err := c.BindJSON(&filter); err != nil {
@@ -54,7 +72,7 @@ func GetLeaves(c *gin.Context) {
 
 	offset := (filter.Page - 1) * filter.Limit
 
-	// 🔥 BASE QUERY (IMPORTANT CHANGE HERE)
+	// 🔥 BASE QUERY
 	baseQuery := `
 	FROM leaves l
 	JOIN users u ON l.user_id = u.id
@@ -64,6 +82,13 @@ func GetLeaves(c *gin.Context) {
 
 	args := []interface{}{}
 	paramIndex := 1
+
+	// 🔥 ROLE FILTER (IMPORTANT)
+	if role != "MANAGER" {
+		baseQuery += " AND u.team = @p" + fmt.Sprint(paramIndex)
+		args = append(args, team)
+		paramIndex++
+	}
 
 	// 🔍 Employee filter
 	if filter.Employee != "" {
@@ -105,7 +130,7 @@ func GetLeaves(c *gin.Context) {
 		return
 	}
 
-	// 🔥 MAIN QUERY WITH PAGINATION
+	// 🔥 MAIN QUERY
 	mainQuery := `
 	SELECT 
 		l.id,
@@ -153,7 +178,6 @@ func GetLeaves(c *gin.Context) {
 		leaves = append(leaves, leave)
 	}
 
-	// ✅ FINAL RESPONSE
 	c.JSON(200, gin.H{
 		"data":  leaves,
 		"total": total,

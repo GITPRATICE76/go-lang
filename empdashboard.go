@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -168,9 +169,10 @@ func GetEmployeeDashboardSummary(c *gin.Context) {
 	for rowsRemarks.Next() {
 		var id int
 		var status, remarks, leaveType string
-		var fromDate, toDate string
+		var fromDate, toDate time.Time
 
 		rowsRemarks.Scan(&id, &status, &remarks, &leaveType, &fromDate, &toDate)
+		days := int(toDate.Sub(fromDate).Hours()/24) + 1
 
 		leaveRemarks = append(leaveRemarks, gin.H{
 			"id":         id,
@@ -179,6 +181,7 @@ func GetEmployeeDashboardSummary(c *gin.Context) {
 			"leave_type": leaveType,
 			"from_date":  fromDate,
 			"to_date":    toDate,
+			"days":       days,
 		})
 	}
 

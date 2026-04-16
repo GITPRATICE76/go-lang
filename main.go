@@ -42,25 +42,25 @@ func main() {
 	auth.Use(AuthMiddleware())
 
 	{
-        // refreash api
+		// refreash api
 		auth.GET("/me", Me)
-        // apply leave api for employees omly
+		// apply leave api for employees omly
 		auth.POST("/applyleave", ApplyLeave)
-        // get all applied negative by employee
-		auth.GET("/leaves", GetLeaves)
-        // manager reply to leaves applied by the customer
+		// get all applied negative by employee
+		auth.POST("/leaves", GetLeaves)
+		// manager reply to leaves applied by the customer
 		auth.POST("/leave/action", LeaveAction)
-        // get organization chart
+		// get organization chart
 		auth.GET("/org-chart", GetOrgChart)
-        // barchart,card 
+		// barchart,card
 		auth.GET("/leave/analytics", GetLeaveAnalytics)
-        // highest leave date,peak leave weak,top leave taker
+		// highest leave date,peak leave weak,top leave taker
 		auth.GET("/dashboard/summary", GetDashboardSummary)
 
 		auth.GET("/employee/dashboard", GetEmployeeDashboardSummary)
-        // holiday applied by empolyee and government leaves
+		// holiday applied by empolyee and government leaves
 		auth.GET("/holidays", GetHolidays)
-        // leave history
+		// leave history
 		auth.POST("/leave/history", GetLeaveHistory)
 
 	}

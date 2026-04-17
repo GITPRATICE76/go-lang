@@ -16,7 +16,7 @@ func GetHolidays(c *gin.Context) {
 	defer db.Close()
 
 	userID := c.GetInt("user_id")
-	role := c.GetString("role")
+	// role := c.GetString("role")
 
 	if userID == 0 {
 		c.JSON(401, gin.H{"message": "Invalid user"})
@@ -71,7 +71,7 @@ func GetHolidays(c *gin.Context) {
 
 	var leaveRows *sql.Rows
 
-	if role == "MANAGER" {
+	 {
 
 		leaveRows, err = db.Query(`
 			SELECT u.id, u.name, l.leave_type, l.from_date, l.to_date
@@ -85,35 +85,36 @@ func GetHolidays(c *gin.Context) {
 			sql.Named("month", month),
 		)
 
-	} else {
-
-		// 👤 Employee → get team
-		var team string
-		err = db.QueryRow(`
-			SELECT team FROM users WHERE id = @userID
-		`,
-			sql.Named("userID", userID),
-		).Scan(&team)
-
-		if err != nil {
-			c.JSON(500, gin.H{"message": "Failed to get team"})
-			return
-		}
-
-		leaveRows, err = db.Query(`
-			SELECT u.id, u.name, l.leave_type, l.from_date, l.to_date
-			FROM leaves l
-			JOIN users u ON l.user_id = u.id
-			WHERE u.team = @team
-			AND l.status = 'APPROVED'
-			AND YEAR(l.from_date) = @year
-			AND MONTH(l.from_date) = @month
-		`,
-			sql.Named("team", team),
-			sql.Named("year", year),
-			sql.Named("month", month),
-		)
 	}
+	//  else {
+
+	// 	// 👤 Employee → get team
+	// 	var team string
+	// 	err = db.QueryRow(`
+	// 		SELECT team FROM users WHERE id = @userID
+	// 	`,
+	// 		sql.Named("userID", userID),
+	// 	).Scan(&team)
+
+	// 	if err != nil {
+	// 		c.JSON(500, gin.H{"message": "Failed to get team"})
+	// 		return
+	// 	}
+
+	// 	leaveRows, err = db.Query(`
+	// 		SELECT u.id, u.name, l.leave_type, l.from_date, l.to_date
+	// 		FROM leaves l
+	// 		JOIN users u ON l.user_id = u.id
+	// 		WHERE u.team = @team
+	// 		AND l.status = 'APPROVED'
+	// 		AND YEAR(l.from_date) = @year
+	// 		AND MONTH(l.from_date) = @month
+	// 	`,
+	// 		sql.Named("team", team),
+	// 		sql.Named("year", year),
+	// 		sql.Named("month", month),
+	// 	)
+	// }
 
 	if err != nil {
 		c.JSON(500, gin.H{"message": err.Error()})

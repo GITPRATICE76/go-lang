@@ -63,18 +63,18 @@ func main() {
 		auth.GET("/holidays", GetHolidays)
 		// leave history
 		auth.POST("/leave/history", GetLeaveHistory)
+		// Get DropDown Values
 		auth.GET("/usercode/details", GetUserCodeDetails)
- 
+		// To Delete Leave Record
+		auth.DELETE("/leave/delete", DeleteLeave)
 
 	}
-
-	// ✅ IMPORTANT: Use Render PORT
 
 	port := os.Getenv("PORT")
 
 	if port == "" {
 
-		port = "8085" // for local development
+		port = "8085"
 
 	}
 

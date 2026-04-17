@@ -27,6 +27,7 @@ type LeaveResponse struct {
 	From         string `json:"from"`
 	To           string `json:"to"`
 	Days         int    `json:"days"`
+	Created_At   string `json:"Created"`
 }
 
 func GetLeaves(c *gin.Context) {
@@ -146,7 +147,8 @@ func GetLeaves(c *gin.Context) {
 		l.status,
 		l.reason,
 		l.from_date,
-		l.to_date
+		l.to_date,
+		l.created_at
 	` + baseQuery + `
 	ORDER BY l.created_at DESC
 	OFFSET @p` + fmt.Sprint(paramIndex) + ` ROWS
@@ -167,6 +169,7 @@ func GetLeaves(c *gin.Context) {
 	for rows.Next() {
 		var leave LeaveResponse
 		var from, to time.Time
+		var Created time.Time
 
 		rows.Scan(
 			&leave.ID,
@@ -176,10 +179,12 @@ func GetLeaves(c *gin.Context) {
 			&leave.Reason,
 			&from,
 			&to,
+			&Created,
 		)
 
-		leave.From = from.Format("Jan 02, 2006")
-		leave.To = to.Format("Jan 02, 2006")
+		leave.From = from.Format("2006-01-02")
+		leave.To = to.Format("2006-01-02")
+		leave.Created_At = Created.Format("Jan 02, 2006 03:04 PM")
 		leave.Days = int(to.Sub(from).Hours()/24) + 1
 
 		leaves = append(leaves, leave)
@@ -191,4 +196,26 @@ func GetLeaves(c *gin.Context) {
 		"page":  filter.Page,
 		"limit": filter.Limit,
 	})
+}
+func DeleteLeave(c *gin.Context) {
+
+	db, err := ConnectDB()
+	if err != nil {
+		c.JSON(500, gin.H{"message": "DB failed"})
+		return
+	}
+	defer db.Close()
+
+	leaveID := c.Query("id")
+
+	_, err = db.Exec(`
+		DELETE FROM leaves WHERE id = @id
+	`, sql.Named("id", leaveID))
+
+	if err != nil {
+		c.JSON(500, gin.H{"message": "Delete failed"})
+		return
+	}
+
+	c.JSON(200, gin.H{"message": "Deleted successfully"})
 }

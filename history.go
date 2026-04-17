@@ -58,7 +58,8 @@ func GetLeaveHistory(c *gin.Context) {
 	FROM leaves l
 	JOIN users u ON l.user_id = u.id
 	WHERE
-	(@p1 = '' OR u.name LIKE '%' + @p1 + '%')
+	l.status IN ('APPROVED', 'REJECTED')
+	AND (@p1 = '' OR u.name LIKE '%' + @p1 + '%')
 	AND (@p2 = '' OR l.from_date >= @p2)
 	AND (@p3 = '' OR l.from_date <= @p3)
 	AND (@p4 = '' OR @p4 = 'ALL' OR l.status = @p4)
@@ -143,7 +144,8 @@ func GetLeaveHistory(c *gin.Context) {
 	FROM leaves l
 	JOIN users u ON l.user_id = u.id
 	WHERE
-	(@p1 = '' OR u.name LIKE '%' + @p1 + '%')
+	l.status IN ('APPROVED', 'REJECTED')
+	AND (@p1 = '' OR u.name LIKE '%' + @p1 + '%')
 	AND (@p2 = '' OR l.from_date >= @p2)
 	AND (@p3 = '' OR l.from_date <= @p3)
 	AND (@p4 = '' OR @p4 = 'ALL' OR l.status = @p4)

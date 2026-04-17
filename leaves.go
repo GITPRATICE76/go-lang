@@ -70,7 +70,7 @@ func ApplyLeave(c *gin.Context) {
 		sql.Named("id", req.UserID),
 	).Scan(&role)
 
-	if err != nil || role != "EMPLOYEE" && role != "RO" {
+	if err != nil || role != "EMPLOYEE" && role != "RO" && role != "MANAGER" {
 		c.JSON(http.StatusForbidden, gin.H{
 			"message": "Employees or Ro can apply for leave",
 		})

@@ -12,6 +12,7 @@ type LeaveHistoryRequest struct {
 	Start  string `json:"start"`
 	End    string `json:"end"`
 	Search string `json:"search"`
+	Status string `json:"status"`
 }
 
 func GetLeaveHistory(c *gin.Context) {
@@ -38,6 +39,7 @@ func GetLeaveHistory(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "DB connection failed"})
 		return
 	}
+	defer db.Close() // ✅ added
 
 	query := `
 	SELECT 
@@ -51,7 +53,7 @@ func GetLeaveHistory(c *gin.Context) {
 		l.reason,
 		l.status,
 		l.created_at,
-			DATEDIFF(day, l.from_date, l.to_date) + 1 AS days
+		DATEDIFF(day, l.from_date, l.to_date) + 1 AS days
 
 	FROM leaves l
 	JOIN users u ON l.user_id = u.id
@@ -59,8 +61,10 @@ func GetLeaveHistory(c *gin.Context) {
 	(@p1 = '' OR u.name LIKE '%' + @p1 + '%')
 	AND (@p2 = '' OR l.from_date >= @p2)
 	AND (@p3 = '' OR l.from_date <= @p3)
+	AND (@p4 = '' OR @p4 = 'ALL' OR l.status = @p4)
+
 	ORDER BY l.from_date DESC
-	OFFSET @p4 ROWS FETCH NEXT @p5 ROWS ONLY
+	OFFSET @p5 ROWS FETCH NEXT @p6 ROWS ONLY
 	`
 
 	rows, err := db.Query(
@@ -68,6 +72,7 @@ func GetLeaveHistory(c *gin.Context) {
 		req.Search,
 		req.Start,
 		req.End,
+		req.Status,
 		offset,
 		req.Limit,
 	)
@@ -94,7 +99,7 @@ func GetLeaveHistory(c *gin.Context) {
 			reason    string
 			status    string
 			createdAt string
-			days      int 
+			days      int
 		)
 
 		err := rows.Scan(
@@ -141,9 +146,16 @@ func GetLeaveHistory(c *gin.Context) {
 	(@p1 = '' OR u.name LIKE '%' + @p1 + '%')
 	AND (@p2 = '' OR l.from_date >= @p2)
 	AND (@p3 = '' OR l.from_date <= @p3)
+	AND (@p4 = '' OR @p4 = 'ALL' OR l.status = @p4)
 	`
 
-	err = db.QueryRow(countQuery, req.Search, req.Start, req.End).Scan(&total)
+	err = db.QueryRow(
+		countQuery,
+		req.Search,
+		req.Start,
+		req.End,
+		req.Status,
+	).Scan(&total)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

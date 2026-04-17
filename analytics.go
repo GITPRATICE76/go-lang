@@ -68,20 +68,20 @@ func GetLeaveAnalytics(c *gin.Context) {
 		if role == "MANAGER" {
 
 			rows, err = db.Query(`
-				SELECT u.name
+				SELECT u.name, l.status
 				FROM leaves l
 				JOIN users u ON l.user_id = u.id
-				WHERE l.status = 'APPROVED'
+				WHERE l.status IN ('APPROVED', 'PENDING')
 				AND @date BETWEEN l.from_date AND l.to_date
 			`, sql.Named("date", dateStr))
 
 		} else {
 
 			rows, err = db.Query(`
-				SELECT u.name
+				SELECT u.name, l.status
 				FROM leaves l
 				JOIN users u ON l.user_id = u.id
-				WHERE l.status = 'APPROVED'
+				WHERE l.status IN ('APPROVED', 'PENDING')
 				AND u.team = @team
 				AND @date BETWEEN l.from_date AND l.to_date
 			`,
@@ -94,15 +94,32 @@ func GetLeaveAnalytics(c *gin.Context) {
 			continue
 		}
 
-		var employees []string
+		// 🔥 NEW: separate lists
+		var approvedEmployees []string
+		var pendingEmployees []string
+
+		approvedCount := 0
+		pendingCount := 0
+
 		for rows.Next() {
-			var name string
-			rows.Scan(&name)
-			employees = append(employees, name)
+			var name, status string
+			rows.Scan(&name, &status)
+
+			switch status {
+			case "APPROVED":
+				approvedCount++
+				approvedEmployees = append(approvedEmployees, name)
+
+			case "PENDING":
+				pendingCount++
+				pendingEmployees = append(pendingEmployees, name)
+			}
 		}
+
 		rows.Close()
 
-		onLeave := len(employees)
+		// 🔥 FIXED: include both
+		onLeave := approvedCount + pendingCount
 
 		leavePercent := 0.0
 		availablePercent := 0.0
@@ -121,7 +138,14 @@ func GetLeaveAnalytics(c *gin.Context) {
 			"leave_percentage":             leavePercent,
 			"available_percentage":         availablePercent,
 			"remaining_allowed_percentage": remainingAllowed,
-			"employees_on_leave":           employees,
+
+			// 🔥 lists
+			"employees_on_leave": approvedEmployees,
+			"employees_pending":  pendingEmployees,
+
+			// 🔥 counts
+			"approved": approvedCount,
+			"pending":  pendingCount,
 		})
 	}
 

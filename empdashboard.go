@@ -171,7 +171,11 @@ func GetEmployeeDashboardSummary(c *gin.Context) {
 		var status, remarks, leaveType string
 		var fromDate, toDate time.Time
 
-		rowsRemarks.Scan(&id, &status, &remarks, &leaveType, &fromDate, &toDate)
+		err := rowsRemarks.Scan(&id, &status, &remarks, &leaveType, &fromDate, &toDate)
+		if err != nil {
+			fmt.Println("SCAN ERROR:", err)
+			continue
+		}
 		days := int(toDate.Sub(fromDate).Hours()/24) + 1
 
 		leaveRemarks = append(leaveRemarks, gin.H{
@@ -185,7 +189,6 @@ func GetEmployeeDashboardSummary(c *gin.Context) {
 		})
 	}
 
-	
 	c.JSON(200, gin.H{
 		"total_leaves_taken":    totalApproved,
 		"pending_requests":      pending,

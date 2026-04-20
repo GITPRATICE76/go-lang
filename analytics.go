@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"math"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -126,9 +127,9 @@ func GetLeaveAnalytics(c *gin.Context) {
 		remainingAllowed := 8.0
 
 		if totalResources > 0 {
-			leavePercent = float64(onLeave) / float64(totalResources) * 100
-			availablePercent = 100 - leavePercent
-			remainingAllowed = 8 - leavePercent
+			leavePercent = math.Round((float64(onLeave) / float64(totalResources)) * 100)
+			availablePercent = math.Round(100 - leavePercent)
+			remainingAllowed = math.Round(8 - leavePercent)
 		}
 
 		result = append(result, gin.H{

@@ -21,33 +21,33 @@ func GetLeaveAnalytics(c *gin.Context) {
 	defer db.Close()
 
 	// 🔥 Get user info
-	userID := c.GetInt("user_id")
-	role := c.GetString("role")
+	// userID := c.GetInt("user_id")
+	// role := c.GetString("role")
 
-	var team string
+	// var team string
 
-	// 👉 If not manager → get team
-	if role != "MANAGER" {
-		err = db.QueryRow(`
-			SELECT team FROM users WHERE id = @userID
-		`, sql.Named("userID", userID)).Scan(&team)
+	// // 👉 If not manager → get team
+	// if role != "MANAGER" {
+	// 	err = db.QueryRow(`
+	// 		SELECT team FROM users WHERE id = @userID
+	// 	`, sql.Named("userID", userID)).Scan(&team)
 
-		if err != nil {
-			c.JSON(500, gin.H{"message": "Failed to get team"})
-			return
-		}
-	}
+	// 	if err != nil {
+	// 		c.JSON(500, gin.H{"message": "Failed to get team"})
+	// 		return
+	// 	}
+	// }
 
 	// 🔥 Total resources (role based)
 	var totalResources int
 
-	if role == "MANAGER" {
-		err = db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&totalResources)
-	} else {
-		err = db.QueryRow(`
-			SELECT COUNT(*) FROM users WHERE team = @team
-		`, sql.Named("team", team)).Scan(&totalResources)
-	}
+	// if role == "MANAGER" {
+	err = db.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&totalResources)
+	// } else {
+	// 	err = db.QueryRow(`
+	// 		SELECT COUNT(*) FROM users WHERE team = @team
+	// 	`, sql.Named("team", team)).Scan(&totalResources)
+	// }
 
 	if err != nil {
 		c.JSON(500, gin.H{"message": "Failed to count employees"})
@@ -66,30 +66,13 @@ func GetLeaveAnalytics(c *gin.Context) {
 		var rows *sql.Rows
 
 		// 🔥 Role-based query
-		if role == "MANAGER" {
-
-			rows, err = db.Query(`
-				SELECT u.name, l.status
-				FROM leaves l
-				JOIN users u ON l.user_id = u.id
-				WHERE l.status IN ('APPROVED', 'PENDING')
-				AND @date BETWEEN l.from_date AND l.to_date
-			`, sql.Named("date", dateStr))
-
-		} else {
-
-			rows, err = db.Query(`
-				SELECT u.name, l.status
-				FROM leaves l
-				JOIN users u ON l.user_id = u.id
-				WHERE l.status IN ('APPROVED', 'PENDING')
-				AND u.team = @team
-				AND @date BETWEEN l.from_date AND l.to_date
-			`,
-				sql.Named("team", team),
-				sql.Named("date", dateStr),
-			)
-		}
+		rows, err = db.Query(`
+	SELECT u.name, l.status
+	FROM leaves l
+	JOIN users u ON l.user_id = u.id
+	WHERE l.status IN ('APPROVED', 'PENDING')
+	AND @date BETWEEN l.from_date AND l.to_date
+`, sql.Named("date", dateStr))
 
 		if err != nil {
 			continue

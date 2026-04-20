@@ -19,6 +19,8 @@ func GetEmployeeDashboardSummary(c *gin.Context) {
 
 	// userID := c.GetInt("userID")
 	userID := c.GetInt("user_id")
+	role := c.GetString("role")
+ 
 
 	if userID == 0 {
 		c.JSON(401, gin.H{"message": "Invalid user"})
@@ -105,31 +107,77 @@ func GetEmployeeDashboardSummary(c *gin.Context) {
 
 	currentlyOnLeave := onLeaveCount > 0
 
-	// 🔥 NEW PART: Get Team Members On Leave
 
 	var team string
+ 
+if role != "MANAGER" {
+ 
 	err = db.QueryRow(`
-		SELECT team FROM users WHERE id = @userID
-	`, sql.Named("userID", userID)).Scan(&team)
 
+		SELECT team FROM users WHERE id = @userID
+
+	`, sql.Named("userID", userID)).Scan(&team)
+ 
 	if err != nil {
+
 		fmt.Println("TEAM ERROR:", err)
+
 		c.JSON(500, gin.H{"message": "Failed to get team"})
+
 		return
+
 	}
 
-	rows, err := db.Query(`
+}
+ 
+var rows *sql.Rows
+ 
+if role == "MANAGER" {
+ 
+	rows, err = db.Query(`
+
 		SELECT u.id, u.name
+
 		FROM users u
+
 		JOIN leaves l ON u.id = l.user_id
-		WHERE u.team = @team
-		AND u.id != @userID
+
+		WHERE u.id != @userID
+
 		AND l.status = 'APPROVED'
+
 		AND CAST(GETDATE() AS DATE) BETWEEN l.from_date AND l.to_date
+
+	`, sql.Named("userID", userID))
+ 
+} else {
+ 
+	rows, err = db.Query(`
+
+		SELECT u.id, u.name
+
+		FROM users u
+
+		JOIN leaves l ON u.id = l.user_id
+
+		WHERE u.team = @team
+
+		AND u.id != @userID
+
+		AND l.status = 'APPROVED'
+
+		AND CAST(GETDATE() AS DATE) BETWEEN l.from_date AND l.to_date
+
 	`,
+
 		sql.Named("team", team),
+
 		sql.Named("userID", userID),
+
 	)
+
+}
+ 
 
 	if err != nil {
 		fmt.Println("TEAM QUERY ERROR:", err)

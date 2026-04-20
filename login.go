@@ -57,7 +57,6 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// 🔥 Create JWT Token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"id":         id,
 		"name":       name,

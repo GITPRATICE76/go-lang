@@ -71,13 +71,13 @@ func GetHolidays(c *gin.Context) {
 
 	var leaveRows *sql.Rows
 
-	 {
+	{
 
 		leaveRows, err = db.Query(`
-			SELECT u.id, u.name, l.leave_type, l.from_date, l.to_date
+    SELECT u.id, u.name, l.leave_type, l.from_date, l.to_date, l.status
 			FROM leaves l
 			JOIN users u ON l.user_id = u.id
-			WHERE l.status = 'APPROVED'
+			WHERE l.status IN ('APPROVED', 'PENDING')
 			AND l.from_date <= EOMONTH(DATEFROMPARTS(@year,@month,1))
             AND l.to_date >= DATEFROMPARTS(@year,@month,1)
 		`,
@@ -126,15 +126,15 @@ func GetHolidays(c *gin.Context) {
 
 	for leaveRows.Next() {
 		var id int
-		var name, leaveType, fromDate, toDate string
-		leaveRows.Scan(&id, &name, &leaveType, &fromDate, &toDate)
-
+		var name, leaveType, fromDate, toDate, status string
+		leaveRows.Scan(&id, &name, &leaveType, &fromDate, &toDate, &status)
 		leaves = append(leaves, gin.H{
 			"user_id":    id,
 			"name":       name,
 			"leave_type": leaveType,
 			"from_date":  fromDate,
 			"to_date":    toDate,
+			"status":     status,
 		})
 	}
 

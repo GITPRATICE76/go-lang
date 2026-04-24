@@ -142,3 +142,23 @@ func ApplyLeave(c *gin.Context) {
 		"message": "Leave applied successfully",
 	})
 }
+
+func AutoRejectLeaves() {
+
+	db, err := ConnectDB()
+	if err != nil {
+		return
+	}
+	defer db.Close()
+
+	_, err = db.Exec(`
+		UPDATE leaves
+		SET status = 'REJECTED'
+		WHERE status = 'PENDING'
+		AND to_date < CAST(GETDATE() AS DATE)
+	`)
+
+	if err != nil {
+		return
+	}
+}

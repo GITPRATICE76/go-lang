@@ -69,6 +69,7 @@ func main() {
 		auth.DELETE("/leave/delete", DeleteLeave)
 
 	}
+	StartAutoRejectJob()
 
 	port := os.Getenv("PORT")
 
@@ -86,4 +87,12 @@ func main() {
 
 	}
 
+}
+func StartAutoRejectJob() {
+	go func() {
+		for {
+			AutoRejectLeaves()
+			time.Sleep(24 * time.Hour)
+		}
+	}()
 }

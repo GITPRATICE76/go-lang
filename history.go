@@ -13,6 +13,7 @@ type LeaveHistoryRequest struct {
 	End    string `json:"end"`
 	Search string `json:"search"`
 	Status string `json:"status"`
+	UserID int    `json:"user_id"` // 🔥 important
 }
 
 func GetLeaveHistory(c *gin.Context) {
@@ -41,6 +42,7 @@ func GetLeaveHistory(c *gin.Context) {
 	}
 	defer db.Close()
 
+	// 🔥 BASE QUERY
 	query := `
 	SELECT
 		l.id,
@@ -58,36 +60,55 @@ func GetLeaveHistory(c *gin.Context) {
 	FROM leaves l
 	LEFT JOIN users u ON l.user_id = u.id
 	WHERE
-		-- ✅ Only past + today
 		CAST(l.to_date AS DATE) <= CAST(GETDATE() AS DATE)
-
-		-- ❌ Remove PENDING
-		AND l.status IN ('APPROVED', 'REJECTED', 'PENDING')
-
-		-- 🔍 Search
-		AND (@p1 = '' OR u.name LIKE '%' + @p1 + '%')
-
-		-- 📅 Correct date range
-		AND (@p2 = '' OR l.to_date >= @p2)
-		AND (@p3 = '' OR l.from_date <= @p3)
-
-		-- 🎯 Optional status filter (still works for APPROVED/REJECTED)
-		AND (@p4 = '' OR @p4 = 'ALL' OR l.status = @p4)
-
-	ORDER BY l.from_date DESC
-	OFFSET @p5 ROWS FETCH NEXT @p6 ROWS ONLY
 	`
 
-	rows, err := db.Query(
-		query,
-		req.Search,
-		req.Start,
-		req.End,
-		req.Status,
-		offset,
-		req.Limit,
-	)
+	args := []interface{}{}
+	paramIndex := 1
 
+	// 🔥 USER FILTER (KEY FIX)
+	if req.UserID != 0 {
+		query += " AND l.user_id = @p" + string(rune(paramIndex+48))
+		args = append(args, req.UserID)
+		paramIndex++
+	}
+
+	// 🔍 SEARCH
+	if req.Search != "" {
+		query += " AND u.name LIKE @p" + string(rune(paramIndex+48))
+		args = append(args, "%"+req.Search+"%")
+		paramIndex++
+	}
+
+	// 📅 DATE FILTER
+	if req.Start != "" {
+		query += " AND l.to_date >= @p" + string(rune(paramIndex+48))
+		args = append(args, req.Start)
+		paramIndex++
+	}
+	if req.End != "" {
+		query += " AND l.from_date <= @p" + string(rune(paramIndex+48))
+		args = append(args, req.End)
+		paramIndex++
+	}
+
+	// 📊 STATUS FILTER
+	if req.Status != "" && req.Status != "ALL" {
+		query += " AND l.status = @p" + string(rune(paramIndex+48))
+		args = append(args, req.Status)
+		paramIndex++
+	}
+
+	// 🔥 PAGINATION
+	query += `
+	ORDER BY l.from_date DESC
+	OFFSET @p` + string(rune(paramIndex+48)) + ` ROWS
+	FETCH NEXT @p` + string(rune(paramIndex+49)) + ` ROWS ONLY
+	`
+
+	args = append(args, offset, req.Limit)
+
+	rows, err := db.Query(query, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -140,32 +161,49 @@ func GetLeaveHistory(c *gin.Context) {
 		})
 	}
 
-	// 🔢 COUNT QUERY
+	// 🔥 COUNT QUERY
 	countQuery := `
 	SELECT COUNT(*)
 	FROM leaves l
 	LEFT JOIN users u ON l.user_id = u.id
 	WHERE
 		CAST(l.to_date AS DATE) <= CAST(GETDATE() AS DATE)
-
-		AND l.status IN ('APPROVED', 'REJECTED')
-
-		AND (@p1 = '' OR u.name LIKE '%' + @p1 + '%')
-		AND (@p2 = '' OR l.to_date >= @p2)
-		AND (@p3 = '' OR l.from_date <= @p3)
-		AND (@p4 = '' OR @p4 = 'ALL' OR l.status = @p4)
 	`
 
+	countArgs := []interface{}{}
+	paramIndex = 1
+
+	if req.UserID != 0 {
+		countQuery += " AND l.user_id = @p" + string(rune(paramIndex+48))
+		countArgs = append(countArgs, req.UserID)
+		paramIndex++
+	}
+
+	if req.Search != "" {
+		countQuery += " AND u.name LIKE @p" + string(rune(paramIndex+48))
+		countArgs = append(countArgs, "%"+req.Search+"%")
+		paramIndex++
+	}
+
+	if req.Start != "" {
+		countQuery += " AND l.to_date >= @p" + string(rune(paramIndex+48))
+		countArgs = append(countArgs, req.Start)
+		paramIndex++
+	}
+	if req.End != "" {
+		countQuery += " AND l.from_date <= @p" + string(rune(paramIndex+48))
+		countArgs = append(countArgs, req.End)
+		paramIndex++
+	}
+
+	if req.Status != "" && req.Status != "ALL" {
+		countQuery += " AND l.status = @p" + string(rune(paramIndex+48))
+		countArgs = append(countArgs, req.Status)
+		paramIndex++
+	}
+
 	var total int
-
-	err = db.QueryRow(
-		countQuery,
-		req.Search,
-		req.Start,
-		req.End,
-		req.Status,
-	).Scan(&total)
-
+	err = db.QueryRow(countQuery, countArgs...).Scan(&total)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

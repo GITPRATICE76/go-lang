@@ -1,31 +1,27 @@
 package main
- 
-import (
 
+import (
 	"database/sql"
 
 	"net/http"
 
 	"time"
- 
+
 	"github.com/gin-gonic/gin"
-
 )
- 
-type ApplyLeaveRequest struct {
 
-	UserID    int    `json:"user_id"`
+type ApplyLeaveRequest struct {
+	UserID int `json:"user_id"`
 
 	LeaveType string `json:"leave_type"`
 
-	FromDate  string `json:"from_date"` 
+	FromDate string `json:"from_date"`
 
-	ToDate    string `json:"to_date"`    
+	ToDate string `json:"to_date"`
 
-	Reason    string `json:"reason"`
-
+	Reason string `json:"reason"`
 }
- 
+
 func ApplyLeave(c *gin.Context) {
 
 	var req ApplyLeaveRequest
@@ -68,17 +64,15 @@ func ApplyLeave(c *gin.Context) {
 		return
 	}
 	defer db.Close()
-
-	// 🔐 Check user role
 	var role string
 	err = db.QueryRow(
 		"SELECT role FROM users WHERE id = @id",
 		sql.Named("id", req.UserID),
 	).Scan(&role)
 
-	if err != nil || role != "EMPLOYEE" {
+	if err != nil || role != "EMPLOYEE" && role != "RO" && role != "MANAGER" {
 		c.JSON(http.StatusForbidden, gin.H{
-			"message": "Only employees can apply for leave",
+			"message": "Employees or Ro can apply for leave",
 		})
 		return
 	}
@@ -149,5 +143,22 @@ func ApplyLeave(c *gin.Context) {
 	})
 }
 
+func AutoRejectLeaves() {
 
- 
+	db, err := ConnectDB()
+	if err != nil {
+		return
+	}
+	defer db.Close()
+
+	_, err = db.Exec(`
+		UPDATE leaves
+		SET status = 'REJECTED'
+		WHERE status = 'PENDING'
+		AND to_date < CAST(GETDATE() AS DATE)
+	`)
+
+	if err != nil {
+		return
+	}
+}

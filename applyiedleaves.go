@@ -20,6 +20,7 @@ type LeaveFilter struct {
 
 type LeaveResponse struct {
 	ID           int    `json:"id"`
+	UserID       int    `json:"user_id"` 
 	EmployeeName string `json:"employeeName"`
 	LeaveType    string `json:"leaveType"`
 	Status       string `json:"status"`
@@ -142,6 +143,7 @@ func GetLeaves(c *gin.Context) {
 	mainQuery := `
 	SELECT 
 		l.id,
+		l.user_id,
 		u.name,
 		l.leave_type,
 		l.status,
@@ -173,6 +175,7 @@ func GetLeaves(c *gin.Context) {
 
 		rows.Scan(
 			&leave.ID,
+			&leave.UserID,        
 			&leave.EmployeeName,
 			&leave.LeaveType,
 			&leave.Status,

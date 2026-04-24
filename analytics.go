@@ -102,8 +102,8 @@ func GetLeaveAnalytics(c *gin.Context) {
 
 		rows.Close()
 
-		// 🔥 FIXED: include both
-		onLeave := approvedCount + pendingCount
+		
+		onLeave := approvedCount 
 
 		leavePercent := 0.0
 		availablePercent := 0.0

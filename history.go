@@ -1,177 +1,306 @@
 package main
  
 import (
-    "net/http"
+
+	"net/http"
  
-    "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
+
 )
  
 type LeaveHistoryRequest struct {
-    Page   int    `json:"page"`
-    Limit  int    `json:"limit"`
-    Start  string `json:"start"`
-    End    string `json:"end"`
-    Search string `json:"search"`
-    Status string `json:"status"`
+
+	Page   int    `json:"page"`
+
+	Limit  int    `json:"limit"`
+
+	Start  string `json:"start"`
+
+	End    string `json:"end"`
+
+	Search string `json:"search"`
+
+	Status string `json:"status"`
+
+	UserID int    `json:"user_id"` // employee id
+
+	IsManager bool `json:"is_manager"` // 🔥 NEW FLAG
+
 }
  
 func GetLeaveHistory(c *gin.Context) {
  
-    var req LeaveHistoryRequest
+	var req LeaveHistoryRequest
  
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
-        return
-    }
+	if err := c.ShouldBindJSON(&req); err != nil {
+
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+
+		return
+
+	}
  
-    if req.Page == 0 {
-        req.Page = 1
-    }
+	// defaults
+
+	if req.Page == 0 {
+
+		req.Page = 1
+
+	}
+
+	if req.Limit == 0 {
+
+		req.Limit = 10
+
+	}
  
-    if req.Limit == 0 {
-        req.Limit = 10
-    }
+	offset := (req.Page - 1) * req.Limit
  
-    offset := (req.Page - 1) * req.Limit
+	db, err := ConnectDB()
+
+	if err != nil {
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "DB connection failed"})
+
+		return
+
+	}
+
+	defer db.Close()
  
-    db, err := ConnectDB()
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "DB connection failed"})
-        return
-    }
-    defer db.Close() // ✅ added
+	// 🔥 user filter logic
+
+	userID := req.UserID
+
+	if req.IsManager {
+
+		userID = 0 // ignore filter → show all
+
+	}
  
-    query := `
-    SELECT
-        l.id,
-        u.name AS employee_name,
-        u.team,
-        u.department,
-        l.from_date,
-        l.to_date,
-        l.leave_type,
-        l.reason,
-        l.status,
-        l.created_at,
-        DATEDIFF(day, l.from_date, l.to_date) + 1 AS days
+	query := `
+
+	SELECT
+
+		l.id,
+
+		l.user_id,
+
+		u.name AS employee_name,
+
+		u.team,
+
+		u.department,
+
+		l.from_date,
+
+		l.to_date,
+
+		l.leave_type,
+
+		l.reason,
+
+		l.status,
+
+		l.created_at,
+
+		DATEDIFF(day, l.from_date, l.to_date) + 1 AS days
+
+	FROM leaves l
+
+	JOIN users u ON l.user_id = u.id
+
+	WHERE
+
+		l.status IN ('APPROVED', 'REJECTED')
  
-    FROM leaves l
-    JOIN users u ON l.user_id = u.id
-    WHERE
-    l.status IN ('APPROVED', 'REJECTED')
-    AND l.to_date <= CAST(GETDATE() AS DATE)
-    AND (@p1 = '' OR u.name LIKE '%' + @p1 + '%')
-    AND (@p2 = '' OR l.from_date >= @p2)
-    AND (@p3 = '' OR l.from_date <= @p3)
-    AND (@p4 = '' OR @p4 = 'ALL' OR l.status = @p4)
+		-- ✅ only past leaves
+
+		AND l.to_date <= CAST(GETDATE() AS DATE)
  
-    ORDER BY l.from_date DESC
-    OFFSET @p5 ROWS FETCH NEXT @p6 ROWS ONLY
-    `
+		-- ✅ role-based filter
+
+		AND (@p1 = 0 OR l.user_id = @p1)
  
-    rows, err := db.Query(
-        query,
-        req.Search,
-        req.Start,
-        req.End,
-        req.Status,
-        offset,
-        req.Limit,
-    )
+		-- filters
+
+		AND (@p2 = '' OR u.name LIKE '%' + @p2 + '%')
+
+		AND (@p3 = '' OR l.from_date >= @p3)
+
+		AND (@p4 = '' OR l.from_date <= @p4)
+
+		AND (@p5 = '' OR @p5 = 'ALL' OR l.status = @p5)
  
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
+	ORDER BY l.from_date DESC
+
+	OFFSET @p6 ROWS FETCH NEXT @p7 ROWS ONLY
+
+	`
  
-    defer rows.Close()
+	rows, err := db.Query(
+
+		query,
+
+		userID,     // p1
+
+		req.Search, // p2
+
+		req.Start,  // p3
+
+		req.End,    // p4
+
+		req.Status, // p5
+
+		offset,     // p6
+
+		req.Limit,  // p7
+
+	)
  
-    var results []gin.H
+	if err != nil {
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+
+		return
+
+	}
+
+	defer rows.Close()
  
-    for rows.Next() {
+	var results []gin.H
  
-        var (
-            id        int
-            name      string
-            team      string
-            dept      string
-            fromDate  string
-            toDate    string
-            leaveType string
-            reason    string
-            status    string
-            createdAt string
-            days      int
-        )
+	for rows.Next() {
  
-        err := rows.Scan(
-            &id,
-            &name,
-            &team,
-            &dept,
-            &fromDate,
-            &toDate,
-            &leaveType,
-            &reason,
-            &status,
-            &createdAt,
-            &days,
-        )
+		var (
+
+			id, userId, days int
+
+			name, team, dept string
+
+			fromDate, toDate string
+
+			leaveType, reason, status, createdAt string
+
+		)
  
-        if err != nil {
-            continue
-        }
+		err := rows.Scan(
+&id,
+&userId,
+&name,
+&team,
+&dept,
+&fromDate,
+&toDate,
+&leaveType,
+&reason,
+&status,
+&createdAt,
+&days,
+
+		)
  
-        results = append(results, gin.H{
-            "id":            id,
-            "employee_name": name,
-            "team":          team,
-            "department":    dept,
-            "from_date":     fromDate,
-            "to_date":       toDate,
-            "leave_type":    leaveType,
-            "reason":        reason,
-            "status":        status,
-            "created_at":    createdAt,
-            "days":          days,
-        })
-    }
+		if err != nil {
+
+			continue
+
+		}
  
-    // count query for pagination
-    var total int
+		results = append(results, gin.H{
+
+			"id":            id,
+
+			"user_id":       userId,
+
+			"employee_name": name,
+
+			"team":          team,
+
+			"department":    dept,
+
+			"from_date":     fromDate,
+
+			"to_date":       toDate,
+
+			"leave_type":    leaveType,
+
+			"reason":        reason,
+
+			"status":        status,
+
+			"created_at":    createdAt,
+
+			"days":          days,
+
+		})
+
+	}
  
-    countQuery := `
-    SELECT COUNT(*)
-    FROM leaves l
-    JOIN users u ON l.user_id = u.id
-    WHERE
-    l.status IN ('APPROVED', 'REJECTED')
-    AND l.to_date <= CAST(GETDATE() AS DATE)
-    AND (@p1 = '' OR u.name LIKE '%' + @p1 + '%')
-    AND (@p2 = '' OR l.from_date >= @p2)
-    AND (@p3 = '' OR l.from_date <= @p3)
-    AND (@p4 = '' OR @p4 = 'ALL' OR l.status = @p4)
-    `
+	// 🔥 COUNT QUERY
+
+	countQuery := `
+
+	SELECT COUNT(*)
+
+	FROM leaves l
+
+	JOIN users u ON l.user_id = u.id
+
+	WHERE
+
+		l.status IN ('APPROVED', 'REJECTED')
+
+		AND l.to_date <= CAST(GETDATE() AS DATE)
  
-    err = db.QueryRow(
-        countQuery,
-        req.Search,
-        req.Start,
-        req.End,
-        req.Status,
-    ).Scan(&total)
+		AND (@p1 = 0 OR l.user_id = @p1)
  
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-        return
-    }
+		AND (@p2 = '' OR u.name LIKE '%' + @p2 + '%')
+
+		AND (@p3 = '' OR l.from_date >= @p3)
+
+		AND (@p4 = '' OR l.from_date <= @p4)
+
+		AND (@p5 = '' OR @p5 = 'ALL' OR l.status = @p5)
+
+	`
  
-    c.JSON(http.StatusOK, gin.H{
-        "data":  results,
-        "total": total,
-        "page":  req.Page,
-        "limit": req.Limit,
-    })
+	var total int
+ 
+	err = db.QueryRow(
+
+		countQuery,
+
+		userID,
+
+		req.Search,
+
+		req.Start,
+
+		req.End,
+
+		req.Status,
+
+	).Scan(&total)
+ 
+	if err != nil {
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+
+		return
+
+	}
+ 
+	c.JSON(http.StatusOK, gin.H{
+
+		"data":  results,
+
+		"total": total,
+
+		"page":  req.Page,
+
+		"limit": req.Limit,
+
+	})
+
 }
- 
  

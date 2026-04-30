@@ -68,6 +68,8 @@ func main() {
 		// To Delete Leave Record
 		auth.DELETE("/leave/delete", DeleteLeave)
 
+		auth.GET("/reporting-to", GetReportingTo)
+
 	}
 	StartAutoRejectJob()
 

@@ -11,11 +11,12 @@ import (
 
 // Request structure
 type RegisterRequest struct {
-	Name       string `json:"name"`
-	Email      string `json:"email"`
-	Password   string `json:"password"`
-	Department string `json:"department"`
-	Team       string `json:"team"`
+	Name        string `json:"name"`
+	Email       string `json:"email"`
+	Password    string `json:"password"`
+	Department  string `json:"department"`
+	Team        string `json:"team"`
+	ReportingTo int    `json:"reporting_to"` // ✅ ADDED
 }
 
 // 🔥 Register API
@@ -31,11 +32,11 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	// Trim inputs (avoid hidden spaces)
+	// Trim inputs
 	req.Department = strings.TrimSpace(req.Department)
 	req.Team = strings.TrimSpace(req.Team)
 
-	// ✅ Connect DB FIRST
+	// Connect DB
 	db, err := ConnectDB()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -45,11 +46,12 @@ func Register(c *gin.Context) {
 	}
 	defer db.Close()
 
-	// 🔍 Debug (optional – remove later)
+	// Debug
 	fmt.Println("Dept:", "["+req.Department+"]")
 	fmt.Println("Team:", "["+req.Team+"]")
+	fmt.Println("ReportingTo:", req.ReportingTo) // ✅ DEBUG
 
-	// ✅ Dynamic validation from DB
+	// Validate department + team
 	if !isValidDepartmentTeam(db, req.Department, req.Team) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"message": "Invalid department and team combination",
@@ -57,10 +59,10 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	// ✅ Insert user
+	// Insert user (UPDATED)
 	query := `
-		INSERT INTO users (name, email, password, role, department, team)
-		VALUES (@name, @email, @password, 'EMPLOYEE', @department, @team)
+		INSERT INTO users (name, email, password, role, department, team, reporting_to)
+		VALUES (@name, @email, @password, 'EMPLOYEE', @department, @team, @reporting_to)
 	`
 
 	_, err = db.Exec(
@@ -70,6 +72,7 @@ func Register(c *gin.Context) {
 		sql.Named("password", req.Password),
 		sql.Named("department", req.Department),
 		sql.Named("team", req.Team),
+		sql.Named("reporting_to", req.ReportingTo), // ✅ ADDED
 	)
 
 	if err != nil {
@@ -84,7 +87,7 @@ func Register(c *gin.Context) {
 	})
 }
 
-// 🔥 Dynamic validation (NO HARDCODING)
+// 🔥 Dynamic validation
 func isValidDepartmentTeam(db *sql.DB, dept, team string) bool {
 
 	query := `
@@ -103,7 +106,46 @@ func isValidDepartmentTeam(db *sql.DB, dept, team string) bool {
 		return false
 	}
 
-	fmt.Println("Match Count:", count) // debug
+	fmt.Println("Match Count:", count)
 
 	return count > 0
-} 
+}
+func GetReportingTo(c *gin.Context) {
+
+	db, err := ConnectDB()
+	if err != nil {
+		c.JSON(500, gin.H{"message": "DB connection failed"})
+		return
+	}
+	defer db.Close()
+
+	rows, err := db.Query(`
+		SELECT id, name, role 
+		FROM users 
+		WHERE role IN ('MANAGER', 'RO')
+	`)
+	if err != nil {
+		c.JSON(500, gin.H{"message": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var data []gin.H
+
+	for rows.Next() {
+		var id int
+		var name, role string
+
+		err := rows.Scan(&id, &name, &role)
+		if err != nil {
+			continue
+		}
+
+		data = append(data, gin.H{
+			"value": id,
+			"label": name + " (" + role + ")",
+		})
+	}
+
+	c.JSON(200, data)
+}

@@ -79,7 +79,10 @@ func GetLeaves(c *gin.Context) {
 	FROM leaves l
 	JOIN users u ON l.user_id = u.id
 	WHERE 1=1
-	AND l.to_date >= CAST(GETDATE() AS DATE)
+	AND (
+    l.to_date >= CAST(GETDATE() AS DATE)
+    OR (l.to_date < CAST(GETDATE() AS DATE) AND l.leave_type = 'SICK')
+)
 	`
 
 	args := []interface{}{}

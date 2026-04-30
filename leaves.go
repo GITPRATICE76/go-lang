@@ -156,6 +156,7 @@ func AutoRejectLeaves() {
 		SET status = 'REJECTED'
 		WHERE status = 'PENDING'
 		AND to_date < CAST(GETDATE() AS DATE)
+		AND leave_type != 'SICK'
 	`)
 
 	if err != nil {

@@ -88,10 +88,9 @@ func GetLeaves(c *gin.Context) {
 	args := []interface{}{}
 	paramIndex := 1
 
-	// 🔥 ROLE FILTER (IMPORTANT)
 	if role != "MANAGER" {
 
-		// 🔥 filter by team
+	
 		baseQuery += " AND u.team = @p" + fmt.Sprint(paramIndex)
 		args = append(args, team)
 		paramIndex++
@@ -117,13 +116,14 @@ func GetLeaves(c *gin.Context) {
 		paramIndex++
 	}
 
-	// 📅 Date filter
-	if filter.Start != "" && filter.End != "" {
-		baseQuery += " AND l.from_date BETWEEN @p" + fmt.Sprint(paramIndex) +
-			" AND @p" + fmt.Sprint(paramIndex+1)
-		args = append(args, filter.Start, filter.End)
-		paramIndex += 2
-	}
+// 📅 Date filter (FIXED)
+if filter.Start != "" && filter.End != "" {
+    baseQuery += " AND (l.from_date <= @p" + fmt.Sprint(paramIndex+1) +
+        " AND l.to_date >= @p" + fmt.Sprint(paramIndex) + ")"
+    
+    args = append(args, filter.Start, filter.End)
+    paramIndex += 2
+}
 
 	// 📊 Status filter
 	if filter.Status != "" && filter.Status != "ALL" {

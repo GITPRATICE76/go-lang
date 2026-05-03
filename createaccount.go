@@ -111,41 +111,45 @@ func isValidDepartmentTeam(db *sql.DB, dept, team string) bool {
 	return count > 0
 }
 func GetReportingTo(c *gin.Context) {
+    db, err := ConnectDB()
+    if err != nil {
+        c.JSON(500, gin.H{"message": "DB connection failed"})
+        return
+    }
+    defer db.Close()
 
-	db, err := ConnectDB()
-	if err != nil {
-		c.JSON(500, gin.H{"message": "DB connection failed"})
-		return
-	}
-	defer db.Close()
+    // Added 'team' to the SELECT statement
+    rows, err := db.Query(`
+        SELECT id, name, role, department, team
+        FROM users 
+        WHERE role IN ('MANAGER', 'RO')
+    `)
+    if err != nil {
+        c.JSON(500, gin.H{"message": err.Error()})
+        return
+    }
+    defer rows.Close()
 
-	rows, err := db.Query(`
-		SELECT id, name, role 
-		FROM users 
-		WHERE role IN ('MANAGER', 'RO')
-	`)
-	if err != nil {
-		c.JSON(500, gin.H{"message": err.Error()})
-		return
-	}
-	defer rows.Close()
+    var data []gin.H
 
-	var data []gin.H
+    for rows.Next() {
+        var id int
+        var name, role, department string
+        var team sql.NullString // Use NullString because Managers might have NULL teams
 
-	for rows.Next() {
-		var id int
-		var name, role string
+        err := rows.Scan(&id, &name, &role, &department, &team)
+        if err != nil {
+            continue
+        }
 
-		err := rows.Scan(&id, &name, &role)
-		if err != nil {
-			continue
-		}
+        data = append(data, gin.H{
+            "value":      id,
+            "label":      name + " (" + role + ")",
+            "department": department,
+            "role":       role,         // Added role for easier filtering
+            "team":       team.String, // Added team to the response
+        })
+    }
 
-		data = append(data, gin.H{
-			"value": id,
-			"label": name + " (" + role + ")",
-		})
-	}
-
-	c.JSON(200, data)
+    c.JSON(200, data)
 }

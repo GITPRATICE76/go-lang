@@ -237,10 +237,13 @@ if role == "MANAGER" {
 		})
 	}
 
+	totalLeaveRequest := totalApproved + pending + rejected
+
 	c.JSON(200, gin.H{
 		"total_leaves_taken":    totalApproved,
 		"pending_requests":      pending,
 		"rejected_requests":     rejected,
+		"total_leave_request":   totalLeaveRequest,
 		"casual_leaves":         casual,
 		"sick_leaves":           sick,
 		"currently_on_leave":    currentlyOnLeave,

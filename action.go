@@ -9,10 +9,10 @@ import (
 )
 
 type LeaveActionRequest struct {
-	UserID  int    `json:"user_id"`   // MANAGER ID
-	LeaveID int    `json:"leave_id"`  // leaves.id
-	Action  string `json:"action"`    // APPROVED / REJECTED
-	Remarks string `json:"remarks"`   // manager remarks
+	UserID  int    `json:"user_id"`  // MANAGER ID
+	LeaveID int    `json:"leave_id"` // leaves.id
+	Action  string `json:"action"`   // APPROVED / REJECTED
+	Remarks string `json:"remarks"`  // manager remarks
 }
 
 func LeaveAction(c *gin.Context) {
@@ -60,14 +60,14 @@ func LeaveAction(c *gin.Context) {
 		sql.Named("id", req.UserID),
 	).Scan(&role)
 
-	if err != nil || role != "MANAGER" {
+	if err != nil || (role != "MANAGER" && role != "RO") {
 		c.JSON(http.StatusForbidden, gin.H{
 			"message": "Only managers can approve or reject leaves",
 		})
 		return
 	}
 
-	// 6️⃣ UPDATE leave 
+	// 6️⃣ UPDATE leave
 	result, err := db.Exec(
 		`
 		UPDATE leaves

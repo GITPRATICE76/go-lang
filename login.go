@@ -32,10 +32,10 @@ func Login(c *gin.Context) {
 	defer db.Close()
 
 	query := `
-		SELECT id, name, role, department, team, password
-		FROM users
-		WHERE email = @email
-	`
+        SELECT id, name, role, department, team, password
+        FROM users
+        WHERE email = @email
+    `
 
 	row := db.QueryRow(
 		query,
@@ -57,7 +57,6 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// 🔥 Create JWT Token
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"id":         id,
 		"name":       name,

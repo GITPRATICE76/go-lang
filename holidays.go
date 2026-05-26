@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,7 +16,7 @@ func GetHolidays(c *gin.Context) {
 	defer db.Close()
 
 	userID := c.GetInt("user_id")
-	role := c.GetString("role")
+	// role := c.GetString("role")
 
 	if userID == 0 {
 		c.JSON(401, gin.H{"message": "Invalid user"})
@@ -72,50 +71,50 @@ func GetHolidays(c *gin.Context) {
 
 	var leaveRows *sql.Rows
 
-	if role == "MANAGER" {
+	{
 
-		// 🔥 Manager sees ALL employees
 		leaveRows, err = db.Query(`
-			SELECT u.id, u.name, l.leave_type, l.from_date, l.to_date
+    SELECT u.id, u.name, l.leave_type, l.from_date, l.to_date, l.status
 			FROM leaves l
 			JOIN users u ON l.user_id = u.id
-			WHERE l.status = 'APPROVED'
-			AND YEAR(l.from_date) = @year
-			AND MONTH(l.from_date) = @month
+			WHERE l.status IN ('APPROVED', 'PENDING')
+			AND l.from_date <= EOMONTH(DATEFROMPARTS(@year,@month,1))
+            AND l.to_date >= DATEFROMPARTS(@year,@month,1)
 		`,
 			sql.Named("year", year),
 			sql.Named("month", month),
 		)
 
-	} else {
-
-		// 👤 Employee → get team
-		var team string
-		err = db.QueryRow(`
-			SELECT team FROM users WHERE id = @userID
-		`,
-			sql.Named("userID", userID),
-		).Scan(&team)
-
-		if err != nil {
-			c.JSON(500, gin.H{"message": "Failed to get team"})
-			return
-		}
-
-		leaveRows, err = db.Query(`
-			SELECT u.id, u.name, l.leave_type, l.from_date, l.to_date
-			FROM leaves l
-			JOIN users u ON l.user_id = u.id
-			WHERE u.team = @team
-			AND l.status = 'APPROVED'
-			AND YEAR(l.from_date) = @year
-			AND MONTH(l.from_date) = @month
-		`,
-			sql.Named("team", team),
-			sql.Named("year", year),
-			sql.Named("month", month),
-		)
 	}
+	//  else {
+
+	// 	// 👤 Employee → get team
+	// 	var team string
+	// 	err = db.QueryRow(`
+	// 		SELECT team FROM users WHERE id = @userID
+	// 	`,
+	// 		sql.Named("userID", userID),
+	// 	).Scan(&team)
+
+	// 	if err != nil {
+	// 		c.JSON(500, gin.H{"message": "Failed to get team"})
+	// 		return
+	// 	}
+
+	// 	leaveRows, err = db.Query(`
+	// 		SELECT u.id, u.name, l.leave_type, l.from_date, l.to_date
+	// 		FROM leaves l
+	// 		JOIN users u ON l.user_id = u.id
+	// 		WHERE u.team = @team
+	// 		AND l.status = 'APPROVED'
+	// 		AND YEAR(l.from_date) = @year
+	// 		AND MONTH(l.from_date) = @month
+	// 	`,
+	// 		sql.Named("team", team),
+	// 		sql.Named("year", year),
+	// 		sql.Named("month", month),
+	// 	)
+	// }
 
 	if err != nil {
 		c.JSON(500, gin.H{"message": err.Error()})
@@ -127,15 +126,15 @@ func GetHolidays(c *gin.Context) {
 
 	for leaveRows.Next() {
 		var id int
-		var name, leaveType, fromDate, toDate string
-		leaveRows.Scan(&id, &name, &leaveType, &fromDate, &toDate)
-
+		var name, leaveType, fromDate, toDate, status string
+		leaveRows.Scan(&id, &name, &leaveType, &fromDate, &toDate, &status)
 		leaves = append(leaves, gin.H{
 			"user_id":    id,
 			"name":       name,
 			"leave_type": leaveType,
 			"from_date":  fromDate,
 			"to_date":    toDate,
+			"status":     status,
 		})
 	}
 
@@ -146,6 +145,3 @@ func GetHolidays(c *gin.Context) {
 		"leaves":   leaves,
 	})
 }
-
-
-
